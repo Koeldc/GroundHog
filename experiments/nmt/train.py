@@ -63,7 +63,9 @@ def parse_args():
 def main():
     args = parse_args()
 
+    # experiment.nmt has the fields of args.proto loaded in __init__.py
     state = getattr(experiments.nmt, args.proto)()
+    # this is based on the suggestion in the README.md in this foloder
     if args.state:
         if args.state.endswith(".py"):
             state.update(eval(open(args.state).read()))
@@ -79,13 +81,16 @@ def main():
     rng = numpy.random.RandomState(state['seed'])
     enc_dec = RNNEncoderDecoder(state, rng, args.skip_init)
     enc_dec.build()
+
     lm_model = enc_dec.create_lm_model()
 
     logger.debug("Load data")
     train_data = get_batch_iterator(state, rng)
     logger.debug("Compile trainer")
+
     algo = eval(state['algo'])(lm_model, state, train_data)
     logger.debug("Run training")
+    
     main = MainLoop(train_data, None, None, lm_model, algo, state, None,
             reset=state['reset'],
             hooks=[RandomSamplePrinter(state, lm_model, train_data)]

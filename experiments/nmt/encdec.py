@@ -1286,6 +1286,8 @@ class RNNEncoderDecoder(object):
 
     def build(self):
         logger.debug("Create input variables")
+
+        ### KelvinXu: What are these _mask variables?
         self.x = TT.lmatrix('x')
         self.x_mask = TT.matrix('x_mask')
         self.y = TT.lmatrix('y')
@@ -1293,8 +1295,10 @@ class RNNEncoderDecoder(object):
         self.inputs = [self.x, self.y, self.x_mask, self.y_mask]
 
         # Annotation for the log-likelihood computation
+        ### KelvinXu: It this hj in the paper?
         training_c_components = []
 
+        ### KelvinXu: why is create_layers as seperate step? 
         logger.debug("Create encoder")
         self.encoder = Encoder(self.state, self.rng,
                 prefix="enc",
@@ -1313,6 +1317,7 @@ class RNNEncoderDecoder(object):
                 skip_init=self.skip_init)
         self.backward_encoder.create_layers()
 
+        ### KelvinXu: why is create_layers as seperate step? 
         logger.debug("Build backward encoding computation graph")
         backward_training_c = self.backward_encoder.build_encoder(
                 self.x[::-1],
@@ -1323,6 +1328,7 @@ class RNNEncoderDecoder(object):
         # Reverse time for backward representations.
         backward_training_c.out = backward_training_c.out[::-1]
 
+        ### KelvinXu: what are these things forward variables? 
         if self.state['forward']:
             training_c_components.append(forward_training_c)
         if self.state['last_forward']:
@@ -1335,6 +1341,7 @@ class RNNEncoderDecoder(object):
                     (backward_training_c[0]))
         self.state['c_dim'] = len(training_c_components) * self.state['dim']
 
+        ### KelvinXu: Begin Decoder Creation
         logger.debug("Create decoder")
         self.decoder = Decoder(self.state, self.rng,
                 skip_init=self.skip_init, compute_alignment=self.compute_alignment)
@@ -1347,6 +1354,7 @@ class RNNEncoderDecoder(object):
         # Annotation for sampling
         sampling_c_components = []
 
+        ### KelvinXu: what is all this stuff?  
         logger.debug("Build sampling computation graph")
         self.sampling_x = TT.lvector("sampling_x")
         self.n_samples = TT.lscalar("n_samples")
@@ -1375,6 +1383,7 @@ class RNNEncoderDecoder(object):
             self.decoder.build_sampler(self.n_samples, self.n_steps, self.T,
                     c=self.sampling_c)
 
+        ### KelvinXu: what are these used for 
         logger.debug("Create auxiliary variables")
         self.c = TT.matrix("c")
         self.step_num = TT.lscalar("step_num")
@@ -1383,6 +1392,7 @@ class RNNEncoderDecoder(object):
         self.gen_y = TT.lvector("gen_y")
 
     def create_lm_model(self):
+        # singleton constructor
         if hasattr(self, 'lm_model'):
             return self.lm_model
         self.lm_model = LM_Model(

@@ -106,6 +106,8 @@ def prototype_phrase_state():
     # Dimensionality of hidden layers
     state['dim'] = 1000
     # Dimensionality of low-rank approximation
+    
+    ### KelvinXu: How does this low rank approximation work?  
     state['rank_n_approx'] = 100
     # k for the maxout stage of output generation
     state['maxout_part'] = 2.
@@ -184,7 +186,7 @@ def prototype_phrase_state():
     # Prefix for the model, state and timing files
     state['prefix'] = 'phrase_'
     # Specifies whether old model should be reloaded first
-    state['reload'] = True
+    state['reload'] = False
     # When set to 0 each new model dump will be saved in a new file
     state['overwrite'] = 1
 
@@ -220,8 +222,11 @@ def prototype_encdec_state():
 
     state = prototype_phrase_state()
 
+    # Source and target sentence
     state['target'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.fr.h5"]
     state['source'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.en.h5"]
+
+    # Word -> Id and Id-> Word Dictionaries
     state['indx_word'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.en.pkl"
     state['indx_word_target'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.fr.pkl"
     state['word_indx'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/vocab.en.pkl"
@@ -236,7 +241,75 @@ def prototype_encdec_state():
     state['seqlen'] = 30
 
     state['dim'] = 1000
+    # embedding dimensionality
     state['rank_n_approx'] = 620
+    state['bs']  = 80
+
+    state['prefix'] = 'encdec_'
+    return state
+
+def prototype_encdec_state_small():
+    """
+    This is some experimenting with the size of the prototypes: small refers to the size of the embedding state
+
+    """
+
+    state = prototype_phrase_state()
+
+    # Source and target sentence
+    state['target'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.fr.h5"]
+    state['source'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.en.h5"]
+
+    # Word -> Id and Id-> Word Dictionaries
+    state['indx_word'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.en.pkl"
+    state['indx_word_target'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.fr.pkl"
+    state['word_indx'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/vocab.en.pkl"
+    state['word_indx_trgt'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/vocab.fr.pkl"
+
+    state['null_sym_source'] = 30000
+    state['null_sym_target'] = 30000
+
+    state['n_sym_source'] = state['null_sym_source'] + 1
+    state['n_sym_target'] = state['null_sym_target'] + 1
+
+    state['seqlen'] = 30
+
+    state['dim'] = 1430
+    # embedding dimensionality
+    state['rank_n_approx'] = 300
+    state['bs']  = 80
+
+    state['prefix'] = 'encdec_'
+    return state
+
+def prototype_encdec_state_big():
+    """
+    This is some experimenting with the size of the prototypes: big refers to the size of the embedding state
+    """
+
+    state = prototype_phrase_state()
+
+    # Source and target sentence
+    state['target'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.fr.h5"]
+    state['source'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.en.h5"]
+
+    # Word -> Id and Id-> Word Dictionaries
+    state['indx_word'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.en.pkl"
+    state['indx_word_target'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.fr.pkl"
+    state['word_indx'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/vocab.en.pkl"
+    state['word_indx_trgt'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/vocab.fr.pkl"
+
+    state['null_sym_source'] = 30000
+    state['null_sym_target'] = 30000
+
+    state['n_sym_source'] = state['null_sym_source'] + 1
+    state['n_sym_target'] = state['null_sym_target'] + 1
+
+    state['seqlen'] = 30
+
+    state['dim'] = 260
+    # embedding dimensionality
+    state['rank_n_approx'] = 1000
     state['bs']  = 80
 
     state['prefix'] = 'encdec_'

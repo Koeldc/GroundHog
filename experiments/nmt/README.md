@@ -12,7 +12,7 @@ RNNsearch translation models used for the paper [1,2]
   most probable translations)
 - score.py is used to score sentences pairs, that is to compute log-likelihood
   of a translation to be generated from a source sentence
-- state.py contains prototype states. In this project a *state* means in fact a
+- state.py contains prototype states(read: config). In this project a *state* means in fact a
   full specification of the model and training process, including architectural
   choices, layer sizes, training data and vocabularies. The prototype states in
   the state.py files are base configurations from which one can start to train a
