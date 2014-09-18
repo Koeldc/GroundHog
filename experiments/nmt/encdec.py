@@ -145,7 +145,7 @@ def get_batch_iterator(state, rng):
                 x = numpy.asarray(list(itertools.chain(*map(operator.itemgetter(0), data))))
                 y = numpy.asarray(list(itertools.chain(*map(operator.itemgetter(1), data))))
                 lens = numpy.asarray([map(len, x), map(len, y)])
-                order = numpy.argsort(lens.max(axis=0)) if state['sort_k_batches'] > 1 \
+                order = numpy.argsort(lens.max(axis=1)) if state['sort_k_batches'] > 1 \
                         else numpy.arange(len(x))
                 for k in range(k_batches):
                     indices = order[k * batch_size:(k + 1) * batch_size]
@@ -303,7 +303,7 @@ class RecurrentLayerWithSearch(Layer):
                    gater_below=None,
                    reseter_below=None,
                    mask=None,
-                   c=None,
+                   c=None, # this is h from the input
                    c_mask=None,
                    p_from_c=None,
                    use_noise=True,
@@ -579,6 +579,7 @@ class EncoderDecoderBase(object):
         # the one used as input,
         # the one used to control resetting gate,
         # the one used to control update gate.
+        # self.num_level controls the depth of the RNN
         self.input_embedders = [lambda x : 0] * self.num_levels
         self.reset_embedders = [lambda x : 0] * self.num_levels
         self.update_embedders = [lambda x : 0] * self.num_levels
@@ -613,6 +614,7 @@ class EncoderDecoderBase(object):
                 n_hids=self.state['dim'] * self.state['dim_mult'],
                 activation=['lambda x:x'])
 
+        # this could in theory be a very deep rnn
         self.inputers = [0] * self.num_levels
         self.reseters = [0] * self.num_levels
         self.updaters = [0] * self.num_levels
@@ -681,6 +683,8 @@ class Encoder(EncoderDecoderBase):
 
         self._create_embedding_layers()
         self._create_transition_layers()
+        # in the current implementation this doesn't do anything (but eventually
+        # you could have a deep network here 
         self._create_inter_level_layers()
         self._create_representation_layers()
 
@@ -1294,11 +1298,12 @@ class RNNEncoderDecoder(object):
         self.y_mask = TT.matrix('y_mask')
         self.inputs = [self.x, self.y, self.x_mask, self.y_mask]
 
-        # Annotation for the log-likelihood computation
-        ### KelvinXu: It this hj in the paper?
+        # Annotation for the log-likelihood computation (this is h in the paper) 
         training_c_components = []
 
-        ### KelvinXu: why is create_layers as seperate step? 
+        # The convention is that first the layers are created
+        # then they are actually built -> the result is a layer with an .out variable
+        # which can be interpreted as a the result of the computation
         logger.debug("Create encoder")
         self.encoder = Encoder(self.state, self.rng,
                 prefix="enc",
@@ -1317,7 +1322,7 @@ class RNNEncoderDecoder(object):
                 skip_init=self.skip_init)
         self.backward_encoder.create_layers()
 
-        ### KelvinXu: why is create_layers as seperate step? 
+        # this big computation graphy is built (they do it backwards)
         logger.debug("Build backward encoding computation graph")
         backward_training_c = self.backward_encoder.build_encoder(
                 self.x[::-1],
@@ -1326,9 +1331,11 @@ class RNNEncoderDecoder(object):
                 approx_embeddings=self.encoder.approx_embedder(self.x[::-1]),
                 return_hidden_layers=True)
         # Reverse time for backward representations.
-        backward_training_c.out = backward_training_c.out[::-1]
+        backward_training_c.out = backward_training_c.out[::-1] # this is done so both the forward and backward c are aligned
 
-        ### KelvinXu: what are these things forward variables? 
+        ## last_forward / last backward is essentially appending H_tx to every vector
+        ## so each annotation has the final annotation (this is not necessary with the
+        ## addition of the alignment model
         if self.state['forward']:
             training_c_components.append(forward_training_c)
         if self.state['last_forward']:
@@ -1347,6 +1354,7 @@ class RNNEncoderDecoder(object):
                 skip_init=self.skip_init, compute_alignment=self.compute_alignment)
         self.decoder.create_layers()
         logger.debug("Build log-likelihood computation graph")
+        # dimensions go (time, example id, dimension) we are concatenating over dimensions [hj_forward; hj_backward] 
         self.predictions, self.alignment = self.decoder.build_decoder(
                 c=Concatenate(axis=2)(*training_c_components), c_mask=self.x_mask,
                 y=self.y, y_mask=self.y_mask)
@@ -1354,7 +1362,7 @@ class RNNEncoderDecoder(object):
         # Annotation for sampling
         sampling_c_components = []
 
-        ### KelvinXu: what is all this stuff?  
+        ### this is used to build the sampler (to do dig into this code) 
         logger.debug("Build sampling computation graph")
         self.sampling_x = TT.lvector("sampling_x")
         self.n_samples = TT.lscalar("n_samples")
@@ -1378,7 +1386,7 @@ class RNNEncoderDecoder(object):
             sampling_c_components.append(ReplicateLayer(self.sampling_x.shape[0])
                     (self.backward_sampling_c[0]))
 
-        self.sampling_c = Concatenate(axis=1)(*sampling_c_components).out
+        self.sampling_c = Concatenate(axis=2)(*sampling_c_components).out
         (self.sample, self.sample_log_prob), self.sampling_updates =\
             self.decoder.build_sampler(self.n_samples, self.n_steps, self.T,
                     c=self.sampling_c)
