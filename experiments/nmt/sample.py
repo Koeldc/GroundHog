@@ -228,6 +228,7 @@ def main():
     logging.basicConfig(level=getattr(logging, state['level']), format="%(asctime)s: %(name)s: %(levelname)s: %(message)s")
 
     rng = numpy.random.RandomState(state['seed'])
+    # we will skip initialization and load the parameters after
     enc_dec = RNNEncoderDecoder(state, rng, skip_init=True)
     enc_dec.build()
     lm_model = enc_dec.create_lm_model()
@@ -246,6 +247,7 @@ def main():
 
     if args.source and args.trans:
         # Actually only beam search is currently supported here
+        # the other sampling method doesn't work
         assert beam_search
         assert args.beam_size
 

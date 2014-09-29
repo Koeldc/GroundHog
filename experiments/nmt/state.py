@@ -186,7 +186,7 @@ def prototype_phrase_state():
     # Prefix for the model, state and timing files
     state['prefix'] = 'phrase_'
     # Specifies whether old model should be reloaded first
-    state['reload'] = False
+    state['reload'] = False 
     # When set to 0 each new model dump will be saved in a new file
     state['overwrite'] = 1
 
@@ -290,14 +290,14 @@ def prototype_encdec_state_big():
     state = prototype_phrase_state()
 
     # Source and target sentence
-    state['target'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.fr.h5"]
-    state['source'] = ["/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/binarized_text.shuffled.en.h5"]
+    state['target'] = ["/data/lisatmp3/chokyun/wmt14/parallel-corpus/en-fr/binarized_text.shuffled.fr.h5"]
+    state['source'] = ["/binarized_text.shuffled.en.h5"]
 
     # Word -> Id and Id-> Word Dictionaries
-    state['indx_word'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.en.pkl"
-    state['indx_word_target'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/ivocab.fr.pkl"
-    state['word_indx'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/vocab.en.pkl"
-    state['word_indx_trgt'] = "/data/lisatmp3/chokyun/mt/vocab.unlimited/bitexts.selected/vocab.fr.pkl"
+    state['indx_word'] = "/ivocab.en.pkl"
+    state['indx_word_target'] = "/ivocab.fr.pkl"
+    state['word_indx'] = "/vocab.en.pkl"
+    state['word_indx_trgt'] = "/vocab.fr.pkl"
 
     state['null_sym_source'] = 30000
     state['null_sym_target'] = 30000

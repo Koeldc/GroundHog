@@ -25,6 +25,7 @@ from groundhog.models import LM_Model
 from groundhog.datasets import PytablesBitextIterator
 from groundhog.utils import sample_zeros, sample_weights_orth, init_bias, sample_weights_classic
 import groundhog.utils as utils
+import pdb
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ def get_batch_iterator(state, rng):
                 x = numpy.asarray(list(itertools.chain(*map(operator.itemgetter(0), data))))
                 y = numpy.asarray(list(itertools.chain(*map(operator.itemgetter(1), data))))
                 lens = numpy.asarray([map(len, x), map(len, y)])
-                order = numpy.argsort(lens.max(axis=1)) if state['sort_k_batches'] > 1 \
+                order = numpy.argsort(lens.max(axis=0)) if state['sort_k_batches'] > 1 \
                         else numpy.arange(len(x))
                 for k in range(k_batches):
                     indices = order[k * batch_size:(k + 1) * batch_size]
@@ -1291,14 +1292,17 @@ class RNNEncoderDecoder(object):
     def build(self):
         logger.debug("Create input variables")
 
-        ### KelvinXu: What are these _mask variables?
+        ### KelvinXu: What are these _mask variables?\
+        ### So since words are of a variable length it is necessary to do this. 
         self.x = TT.lmatrix('x')
         self.x_mask = TT.matrix('x_mask')
         self.y = TT.lmatrix('y')
         self.y_mask = TT.matrix('y_mask')
         self.inputs = [self.x, self.y, self.x_mask, self.y_mask]
 
+        # KelvinXu
         # Annotation for the log-likelihood computation (this is h in the paper) 
+        # c in code --> h in paper 
         training_c_components = []
 
         # The convention is that first the layers are created

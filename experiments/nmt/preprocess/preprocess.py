@@ -6,9 +6,11 @@ import gzip
 import bz2
 import logging
 import os
+import string
 
 import numpy
 import tables
+import pdb
 
 from collections import Counter
 from operator import add
@@ -37,6 +39,8 @@ parser.add_argument("-n", "--ngram", type=int, metavar="N",
 parser.add_argument("-v", "--vocab", type=int, metavar="N",
                     help="limit vocabulary size to this number, which must "
                           "include BOS/EOS and OOV markers")
+parser.add_argument("-f", "--format", type=str, metavar="N",
+                    help="character encoding (when absent, it is assumed to be ascii)")
 parser.add_argument("-p", "--pickle", action="store_true",
                     help="pickle the text as a list of lists of ints")
 parser.add_argument("-s", "--split", type=float, metavar="N",
@@ -100,6 +104,9 @@ def safe_hdf(array, name):
                                 array.shape, filters=filters)
             ds[:] = array
 
+def process_utf8(line):
+    return [c for c in line.strip().decode('utf8')
+                            if (c not in string.ascii_letters) and c != ' ']
 
 def create_dictionary():
     # Part I: Counting the words
@@ -119,7 +126,17 @@ def create_dictionary():
             counter = Counter()
             sentence_count = 0
             for line in input_file:
-                counter.update(line.strip().split(' '))
+                if args.format is None:
+                    counter.update(line.strip().split(' '))
+                elif args.format == 'utf8':
+                    # we ignore ascii letters like 'abc' presumably
+                    # since the target language is not based on the roman
+                    # alphabet
+                    characters = [c for c in line.strip().decode('utf8')
+                            if (c not in string.ascii_letters) and c != ' ']
+                    counter.update(characters)
+                else:
+                    raise KeyError("Unknown formatting argument")
                 sentence_count += 1
         counters.append(counter)
         sentence_counts.append(sentence_count)
@@ -145,7 +162,7 @@ def create_dictionary():
             args.vocab = len(combined_counter) + 2
         vocab_count = combined_counter.most_common(args.vocab - 2)
         logger.info("Creating dictionary of %s most common words, covering "
-                    "%2.1f%% of the text."
+                    "%2.3f%% of the text."
                     % (args.vocab,
                        100.0 * sum([count for word, count in vocab_count]) /
                        sum(combined_counter.values())))
@@ -174,7 +191,13 @@ def binarize():
         binarized_corpus = []
         ngram_count = 0
         for sentence_count, sentence in enumerate(input_file):
-            words = sentence.strip().split(' ')
+            if args.format is None:
+                words = sentence.strip().split(' ')
+            elif args.format == 'utf8':
+                words = [w for w in sentence.strip().decode('utf8')
+                        if (w not in string.ascii_letters) and w != ' ']
+            else:
+                raise KeyError("Unknown formatting argument")
             binarized_sentence = [vocab.get(word, 1) for word in words]
             binarized_corpus.append(binarized_sentence)
             if args.ngram:

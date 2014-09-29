@@ -82,6 +82,7 @@ def main():
     enc_dec = RNNEncoderDecoder(state, rng, args.skip_init)
     enc_dec.build()
 
+    # after this point lm is also embedded as a member of enc_dec
     lm_model = enc_dec.create_lm_model()
 
     logger.debug("Load data")
