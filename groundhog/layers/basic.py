@@ -473,6 +473,7 @@ class Layer(Container):
         if 'one_step' in kwargs:
             del kwargs['one_step']
         new_obj.prev_args = (args, kwargs)
+
         if kind == 'fprop':
             new_obj.fprop(*args, **kwargs)
         elif kind == 'eval':

@@ -54,5 +54,3 @@ def smoothed_bleu(stats):
     c, r = stats[:2]
     log_bleu_prec = sum([numpy.log((1 + float(x)) / (1 + y)) for x, y in zip(stats[2::2], stats[3::2])]) / 4.
     return numpy.exp(min(0, 1 - float(r) / c) + log_bleu_prec) * 100
-
-

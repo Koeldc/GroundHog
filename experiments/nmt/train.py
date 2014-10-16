@@ -7,6 +7,7 @@ import pprint
 
 import numpy
 
+
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
 from groundhog.trainer.SGD import SGD as SGD
 from groundhog.trainer.SGD_momentum import SGD as SGD_momentum
@@ -45,10 +46,18 @@ class RandomSamplePrinter(object):
                 if len(x_words) == 0:
                     continue
 
-                print "Input: {}".format(" ".join(x_words))
-                print "Target: {}".format(" ".join(y_words))
+                if self.state['source_encoding'] == "uft8":
+                    print u"Input: {}".format(" ".join(x_words))
+                elif self.state['source_encoding'] == "ascii":
+                    print "Input: {}".format(" ".join(x_words))
+
+                if self.state['target_encoding'] == "utf8":
+                    print u"Target: {}".format(" ".join(y_words))
+                elif self.state['target_encoding'] == "ascii":
+                    print "Target: {}".format(" ".join(y_words))
                 self.model.get_samples(self.state['seqlen'] + 1, self.state['n_samples'], x[:len(x_words)])
                 sample_idx += 1
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -81,9 +90,14 @@ def main():
     rng = numpy.random.RandomState(state['seed'])
     enc_dec = RNNEncoderDecoder(state, rng, args.skip_init)
     enc_dec.build()
-
     # after this point lm is also embedded as a member of enc_dec
     lm_model = enc_dec.create_lm_model()
+
+    # if we are going to do early stopping with bleu, we'll need a beamsearch guy
+    #Import sample ----> make beamsearch guy --> do all the other jazz
+    
+    
+    #
 
     logger.debug("Load data")
     train_data = get_batch_iterator(state, rng)

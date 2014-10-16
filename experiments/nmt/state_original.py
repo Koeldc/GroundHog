@@ -1,16 +1,3 @@
-"""
-    Config file:
-        - general inheritance of params heirarchy is 
-            Prototype_phrase_state()
-                prototype_encdec_state_*
-                    prototype_search_state_*
-
-    Therefore, if GHOG is configured with prototype_encdec_state_* for example
-    it will have all the state settings in prototype_phrase_state and 
-    whatever was added or overwritten in prototype_encdec_state_*
-
-"""
-
 def prototype_phrase_state():
     """This prototype is the configuration used in the paper
     'Learning Phrase Representations using RNN Encoder-Decoder
@@ -267,33 +254,6 @@ def prototype_encdec_state_zh_en():
 
     return state
 
-def prototype_search_state_zh_en_huge():
-    """
-    This prototype is for zh-> with a large hidden state 
-    
-    This was used once but it was determined that a smaller
-    model overfit a lot 
-    """
-    state = prototype_encdec_state_zh_en()
-
-    #location of validation set
-    state['source'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5")
-    state['target'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5")
-
-    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
-    state['search'] = True
-    state['last_forward'] = False
-    state['forward'] = True
-    state['backward'] = True
-
-    state['dim'] = 4000
-    # embedding dimensionality
-    state['rank_n_approx'] = 800
-    state['seqlen'] = 30
-
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/huge/encdec_30_zh_en_'
-    return state
-
 def prototype_search_state_zh_en():
     """
     This prototype is for zh -> english 
@@ -310,7 +270,7 @@ def prototype_search_state_zh_en():
     state['forward'] = True
     state['backward'] = True
 
-    state['dim'] = 1000
+    state['dim'] = 2000
     # embedding dimensionality
     state['rank_n_approx'] = 600
 
@@ -352,11 +312,9 @@ def prototype_encdec_state_zh():
 
     return state
 
-
 def prototype_search_state_zh_big_openmt15():
     """
     This is for openmt15
-    en-> zh
     """
     state = prototype_encdec_state_zh()
 
@@ -383,36 +341,6 @@ def prototype_search_state_zh_big_openmt15():
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/openmt_models/encdec_30_big_open_mt'
     return state
 
-def prototype_search_state_zh_en_big_openmt15():
-    """
-    This is for openmt15
-    zh -> english
-    """
-    state = prototype_encdec_state_zh_en()
-
-    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
-    state['search'] = True
-    state['last_forward'] = False
-    state['forward'] = True
-    state['backward'] = True
-
-    # overwrite this from above
-    # Source and target sentence
-    state['source'] = ["/data/lisatmp3/xukelvin/translation/en-zh/openmt/binarized_text.zh.shuf.h5"]
-    state['target'] = ["/data/lisatmp3/xukelvin/translation/en-zh/openmt/binarized_text.en.shuf.h5"]
-    # Word -> Id and Id-> Word Dictionaries
-    state['indx_word_target'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/ivocab.en.pkl"
-    state['indx_word'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/ivocab.zh.pkl"
-    state['word_indx_trgt'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/vocab.en.pkl"
-    state['word_indx'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/vocab.zh.pkl"   
-
-    state['dim'] = 2000
-    # embedding dimensionality
-    state['rank_n_approx'] = 600
-
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/openmt_models/encdec_30_big_open_mt_'
-    return state
-
 def prototype_search_state_zh_small():
     """
     This prototype integrates the search model into the translation
@@ -432,28 +360,6 @@ def prototype_search_state_zh_small():
 
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/encdec_30_small_'
     return state
-
-def prototype_search_state_zh_huge():
-    """
-    This prototype integrates the search model into the translation with a very large size
-    """
-    state = prototype_encdec_state_zh()
-
-    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
-    state['search'] = True
-    state['last_forward'] = False
-    state['forward'] = True
-    state['backward'] = True
-
-    state['seqlen'] = 50
-
-    state['dim'] = 2048
-    # embedding dimensionality
-    state['rank_n_approx'] = 800
-
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/huge/encdec_30_huge_'
-    return state
-
 
 def prototype_search_state_zh_big():
     """
@@ -525,33 +431,15 @@ def prototype_search_state():
     state['prefix'] = 'search_'
     return state
 
-def prototype_test():
-    """
-    This is just some testing 
-    """
-    state = prototype_encdec_state_zh()
+def prototype_phrase_lstm_state():
+    state = prototype_phrase_state()
+    state['enc_rec_layer'] = 'LSTMLayer'
+    state['enc_rec_gating'] = False
+    state['enc_rec_reseting'] = False
+    state['dec_rec_layer'] = 'LSTMLayer'
+    state['dec_rec_gating'] = False
+    state['dec_rec_reseting'] = False
+    state['dim_mult'] = 4
 
-    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
-    state['search'] = True
-    state['last_forward'] = False
-    state['forward'] = True
-    state['backward'] = True
-
-    # overwrite this from above
-    # Source and target sentence
-    state['target'] = ["/data/lisatmp3/xukelvin/translation/en-zh/openmt/binarized_text.zh.shuf.h5"]
-    state['source'] = ["/data/lisatmp3/xukelvin/translation/en-zh/openmt/binarized_text.en.shuf.h5"]
-    # Word -> Id and Id-> Word Dictionaries
-    state['indx_word'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/ivocab.en.pkl"
-    state['indx_word_target'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/ivocab.zh.pkl"
-    state['word_indx'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/vocab.en.pkl"
-    state['word_indx_trgt'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/vocab.zh.pkl"   
-
-    state['dim'] = 1000
-    # embedding dimensionality
-    state['rank_n_approx'] = 200
-
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/test/test_test_'
+    state['prefix'] = 'phrase_lstm_'
     return state
-
-

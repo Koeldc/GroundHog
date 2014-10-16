@@ -443,7 +443,7 @@ class RecurrentLayerWithSearch(Layer):
         if nsteps is None:
             nsteps = state_below.shape[0]
             if batch_size and batch_size != 1:
-                nsteps = nsteps / batch_size
+                nstphrase_stateeps = nsteps / batch_size
         if batch_size is None and state_below.ndim == 3:
             batch_size = state_below.shape[1]
         if state_below.ndim == 2 and \
@@ -1292,7 +1292,6 @@ class RNNEncoderDecoder(object):
     def build(self):
         logger.debug("Create input variables")
 
-        ### KelvinXu: What are these _mask variables?\
         ### So since words are of a variable length it is necessary to do this. 
         self.x = TT.lmatrix('x')
         self.x_mask = TT.matrix('x_mask')
@@ -1300,7 +1299,6 @@ class RNNEncoderDecoder(object):
         self.y_mask = TT.matrix('y_mask')
         self.inputs = [self.x, self.y, self.x_mask, self.y_mask]
 
-        # KelvinXu
         # Annotation for the log-likelihood computation (this is h in the paper) 
         # c in code --> h in paper 
         training_c_components = []
@@ -1352,7 +1350,7 @@ class RNNEncoderDecoder(object):
                     (backward_training_c[0]))
         self.state['c_dim'] = len(training_c_components) * self.state['dim']
 
-        ### KelvinXu: Begin Decoder Creation
+        # Decoder creation section 
         logger.debug("Create decoder")
         self.decoder = Decoder(self.state, self.rng,
                 skip_init=self.skip_init, compute_alignment=self.compute_alignment)
@@ -1390,12 +1388,12 @@ class RNNEncoderDecoder(object):
             sampling_c_components.append(ReplicateLayer(self.sampling_x.shape[0])
                     (self.backward_sampling_c[0]))
 
-        self.sampling_c = Concatenate(axis=2)(*sampling_c_components).out
+        self.sampling_c = Concatenate(axis=1)(*sampling_c_components).out
         (self.sample, self.sample_log_prob), self.sampling_updates =\
             self.decoder.build_sampler(self.n_samples, self.n_steps, self.T,
                     c=self.sampling_c)
 
-        ### KelvinXu: what are these used for 
+        ### KelvinXu
         logger.debug("Create auxiliary variables")
         self.c = TT.matrix("c")
         self.step_num = TT.lscalar("step_num")
@@ -1504,11 +1502,18 @@ class RNNEncoderDecoder(object):
                 return probs
         return probs_computer
 
-def parse_input(state, word2idx, line, raise_unk=False, idx2word=None):
-    seqin = line.split()
+def parse_input(state, word2idx, line, raise_unk=False, idx2word=None, unk_sym=-1, null_sym=-1):
+    if unk_sym < 0:
+        unk_sym = state['unk_sym_source']
+    if null_sym < 0:
+        null_sym = state['null_sym_source']
+
+    if state['source_encoding'] == 'utf8':
+        seqin = [l for l in line]
+    else:
+        seqin = line.split()
     seqlen = len(seqin)
     seq = numpy.zeros(seqlen+1, dtype='int64')
-    unk_sym = state['unk_sym_source']
     for idx,sx in enumerate(seqin):
         seq[idx] = word2idx.get(sx, unk_sym)
         if seq[idx] >= state['n_sym_source']:
@@ -1516,11 +1521,12 @@ def parse_input(state, word2idx, line, raise_unk=False, idx2word=None):
         if seq[idx] == unk_sym and raise_unk:
             raise Exception("Unknown word {}".format(sx))
 
-    seq[-1] = state['null_sym_source']
+    seq[-1] = null_sym
     if idx2word:
-        idx2word[state['null_sym_source']] = '<eos>'
+        idx2word[null_sym] = '<eos>'
         idx2word[unk_sym] = state['oov']
         parsed_in = [idx2word[sx] for sx in seq]
         return seq, " ".join(parsed_in)
 
     return seq, seqin
+

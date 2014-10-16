@@ -132,6 +132,7 @@ class LM_Model(Model):
         grad_norm = TT.sqrt(sum(TT.sum(x**2)
             for x,p in zip(self.param_grads, self.params) if p not in
                 self.exclude_params_for_norm))
+        # another place to add stuff that gets saved into timing.npz
         new_properties = [
                 ('grad_norm', grad_norm),
                 ('log2_p_word', self.train_cost / num_words / scale),

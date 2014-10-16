@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class BatchTxtIterator(object):
 
-    def __init__(self, state, txt, indx,  batch_size, raise_unk):
+    def __init__(self, state, txt, indx,  batch_size, raise_unk, unk_sym, null_sym):
         self.__dict__.update(locals())
         self.__dict__.pop('self')
 
@@ -44,7 +44,8 @@ class BatchTxtIterator(object):
         try:
             while len(seqs) < self.batch_size:
                 line = next(self.txt_file).strip()
-                seq, _ = parse_input(self.state, self.indx, line, raise_unk=self.raise_unk)
+                seq, _ = parse_input(self.state, self.indx, line, raise_unk=self.raise_unk, 
+                                     unk_sym=self.unk_sym, null_sym=self.null_sym)
                 seqs.append(seq)
             return self._pack(seqs)
         except StopIteration:
@@ -57,8 +58,10 @@ class BatchBiTxtIterator(object):
     def __init__(self, state, src, indx_src, trg, indx_trg, batch_size, raise_unk):
         self.__dict__.update(locals())
         self.__dict__.pop('self')
-        self.src_iter = BatchTxtIterator(state, src, indx_src, batch_size, raise_unk)
-        self.trg_iter = BatchTxtIterator(state, trg, indx_trg, batch_size, raise_unk)
+        self.src_iter = BatchTxtIterator(state, src, indx_src, batch_size, raise_unk, 
+                                         unk_sym=state['unk_sym_source'], null_sym=state['null_sym_source'])
+        self.trg_iter = BatchTxtIterator(state, trg, indx_trg, batch_size, raise_unk,
+                                         unk_sym=state['unk_sym_target'], null_sym=state['null_sym_target'])
 
     def start(self):
         self.src_iter.start()
@@ -125,6 +128,7 @@ def main():
 
     indx_word_src = cPickle.load(open(state['word_indx'],'rb'))
     indx_word_trgt = cPickle.load(open(state['word_indx_trgt'], 'rb'))
+
 
     if args.mode == "batch":
         data_given = args.src or args.trg

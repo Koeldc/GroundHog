@@ -55,6 +55,9 @@ class SGD(object):
         self.model = model
         self.rng = numpy.random.RandomState(state['seed'])
         srng = RandomStreams(self.rng.randint(213))
+        # borrow = true gives us an unaliased copy of the variable
+        # essentially letting you get a copy of the variable without 
+        # reduplicating it 
         self.gs = [theano.shared(numpy.zeros(p.get_value(borrow=True).shape,
                                              dtype=theano.config.floatX),
                                 name=p.name)
@@ -88,6 +91,8 @@ class SGD(object):
         self.prop_exprs = [x[1] for x in model.properties]
         self.prop_names = [x[0] for x in model.properties]
         self.update_rules = [x[1] for x in model.updates]
+        # contatenate the list of these parameters, replace the params with
+        # mirror copies 
         rval = theano.clone(model.param_grads + self.update_rules + \
                             self.prop_exprs + [model.train_cost],
                             replace=zip(model.inputs, loc_data))

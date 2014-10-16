@@ -105,7 +105,7 @@ def safe_hdf(array, name):
             ds[:] = array
 
 def process_utf8(line):
-    return [c for c in line.strip().decode('utf8')
+    return [c for c in line.strip().decode('utf8', "replace")
                             if (c not in string.ascii_letters) and c != ' ']
 
 def create_dictionary():
@@ -132,7 +132,7 @@ def create_dictionary():
                     # we ignore ascii letters like 'abc' presumably
                     # since the target language is not based on the roman
                     # alphabet
-                    characters = [c for c in line.strip().decode('utf8')
+                    characters = [c for c in line.strip().decode('utf8', "replace")
                             if (c not in string.ascii_letters) and c != ' ']
                     counter.update(characters)
                 else:
@@ -194,7 +194,7 @@ def binarize():
             if args.format is None:
                 words = sentence.strip().split(' ')
             elif args.format == 'utf8':
-                words = [w for w in sentence.strip().decode('utf8')
+                words = [w for w in sentence.strip().decode('utf8', "replace")
                         if (w not in string.ascii_letters) and w != ' ']
             else:
                 raise KeyError("Unknown formatting argument")

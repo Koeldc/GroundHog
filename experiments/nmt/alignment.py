@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import argparse
 import cPickle
@@ -6,15 +7,24 @@ import traceback
 import logging
 import time
 import sys
+import codecs
 
 import numpy
-import ipdb
 
 import experiments.nmt
 from experiments.nmt import\
     RNNEncoderDecoder,\
     prototype_phrase_state,\
     parse_input
+
+# this is done to avoid interactive plotting
+# while running without -X forwarding 
+#import matplotlib
+#matplotlib.use('Agg')
+
+import pylab
+
+#from experiments.nmt.numpy_compat import argpartition
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +66,7 @@ class BeamSearch(object):
         trans = [[]]
         costs = [0.0]
 
-        for k in range(10 * len(seq)):
+        for k in range(3 * len(seq)):
             if n_samples == 0:
                 break
 
@@ -71,6 +81,7 @@ class BeamSearch(object):
             # Adjust log probs according to search restrictions
             if ignore_unk:
                 log_probs[:,self.unk_id] = -numpy.inf
+
             # TODO: report me in the paper!!!
             if k < minlen:
                 log_probs[:,self.eos_id] = -numpy.inf
@@ -124,7 +135,6 @@ class BeamSearch(object):
                 logger.warning("Did not manage without UNK")
                 return self.search(seq, n_samples, False, minlen)
             elif n_samples < 500:
-                #import ipdb; ipdb.set_trace()
                 logger.warning("Still no translations: try beam size {}".format(n_samples * 2))
                 return self.search(seq, n_samples * 2, False, minlen)
             else:
@@ -142,49 +152,82 @@ def indices_to_words(i2w, seq):
         sen.append(i2w[seq[k]])
     return sen
 
+
 def sample(lm_model, seq, n_samples,
-        sampler=None, beam_search=None,
-        ignore_unk=False, normalize=False,
-        alpha=1, verbose=False):
+           sampler=None, beam_search=None,
+           ignore_unk=False, normalize=False,
+           alpha=1, probs_computer=None,
+           verbose=False):
     if beam_search:
         sentences = []
         trans, costs = beam_search.search(seq, n_samples,
-                ignore_unk=ignore_unk, minlen=len(seq) / 2)
+                                          ignore_unk=ignore_unk,
+                                          minlen=len(seq) / 2)
         if normalize:
             counts = [len(s) for s in trans]
             costs = [co / cn for co, cn in zip(costs, counts)]
+
         for i in range(len(trans)):
             sen = indices_to_words(lm_model.word_indxs, trans[i])
+            src_sen = indices_to_words(lm_model.word_indxs_src, seq)
+
             sentences.append(" ".join(sen))
+            probs, alignments = probs_computer(seq, numpy.asarray(trans[i], dtype="int64"))
+
+            alignments = numpy.asarray(alignments)
+            alignments = alignments.reshape(alignments.shape[0], alignments.shape[1])
+            pylab.figure()
+            pylab.tick_params(axis='both', which='major', labelsize=5)
+            pylab.tick_params(axis='both', which='minor', labelsize=5)
+            pylab.yticks([i for i in range(len(sen))], [j for j in sen])
+            pylab.xticks([i for i in range(len(seq))], [c for char in src_sen for c in char ])
+            pylab.gray()
+            pylab.imshow(alignments, interpolation="none")
+            pylab.savefig("alignments_%d.png" % i)
+
         for i in range(len(costs)):
             if verbose:
                 print "{}: {}".format(costs[i], sentences[i].encode('utf-8'))
+
         return sentences, costs, trans
+
     elif sampler:
         sentences = []
         all_probs = []
         costs = []
+        values, cond_probs = sampler(n_samples,
+                                     3 * (len(seq) - 1),
+                                     alpha, seq)
 
-        values, cond_probs = sampler(n_samples, 3 * (len(seq) - 1), alpha, seq)
         for sidx in xrange(n_samples):
             sen = []
+
             for k in xrange(values.shape[0]):
                 if lm_model.word_indxs[values[k, sidx]] == '<eol>':
                     break
                 sen.append(lm_model.word_indxs[values[k, sidx]])
+
             sentences.append(" ".join(sen))
             probs = cond_probs[:, sidx]
             probs = numpy.array(cond_probs[:len(sen) + 1, sidx])
             all_probs.append(numpy.exp(-probs))
             costs.append(-numpy.sum(probs))
+
+        probs, alignments = probs_computer(seq, values)
+        print(alignments)
+
+        #TODO Add the alignment code here
         if normalize:
             counts = [len(s.strip().split(" ")) for s in sentences]
             costs = [co / cn for co, cn in zip(costs, counts)]
+
         sprobs = numpy.argsort(costs)
+
         if verbose:
             for pidx in sprobs:
                 print "{}: {} {} {}".format(pidx, -costs[pidx], all_probs[pidx], sentences[pidx])
             print
+
         return sentences, costs, None
     else:
         raise Exception("I don't know what to do")
@@ -192,7 +235,7 @@ def sample(lm_model, seq, n_samples,
 
 def parse_args():
     parser = argparse.ArgumentParser(
-            "Sample (of find with beam-search) translations from a translation model")
+            "Sample (of find with beam-serch) translations from a translation model")
     parser.add_argument("--state",
             required=True, help="State to use")
     parser.add_argument("--beam-search",
@@ -217,7 +260,12 @@ def parse_args():
     parser.add_argument("changes",
             nargs="?", default="",
             help="Changes to state")
+    parser.add_argument("--src_word_idxs",
+            default=None,
+            help="Source word indices")
+
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
@@ -227,69 +275,82 @@ def main():
         state.update(cPickle.load(src))
     state.update(eval("dict({})".format(args.changes)))
 
-
-    logging.basicConfig(level=getattr(logging, state['level']), format="%(asctime)s: %(name)s: %(levelname)s: %(message)s")
+    logging.basicConfig(level=getattr(logging, state['level']),
+                        format="%(asctime)s: %(name)s: %(levelname)s: %(message)s")
 
     rng = numpy.random.RandomState(state['seed'])
-    # we will skip initialization and load the parameters after
-    enc_dec = RNNEncoderDecoder(state, rng, skip_init=True)
+    enc_dec = RNNEncoderDecoder(state, rng,
+                                skip_init=True,
+                                compute_alignment=True)
+
     enc_dec.build()
-
-
     lm_model = enc_dec.create_lm_model()
     lm_model.load(args.model_path)
     indx_word = cPickle.load(open(state['word_indx'],'rb'))
 
     sampler = None
     beam_search = None
+    probs_computer = enc_dec.create_probs_computer(return_alignment=True)
+
     if args.beam_search:
         beam_search = BeamSearch(enc_dec)
         beam_search.compile()
     else:
         sampler = enc_dec.create_sampler(many_samples=True)
 
-    idict_src = cPickle.load(open(state['indx_word'],'r'))
+    if args.src_word_idxs :
+        idict_src = cPickle.load(open(args.src_word_idxs, 'r'))
+        lm_model.word_indxs_src = idict_src
+    else:
+        idict_src = cPickle.load(open(state['indx_word'], 'r'))
 
     if args.source and args.trans:
         # Actually only beam search is currently supported here
-        # the other sampling method doesn't work
         assert beam_search
         assert args.beam_size
 
         fsrc = open(args.source, 'r')
-        ftrans = open(args.trans, 'w')
+        ftrans = codecs.open(args.trans, 'w', 'utf-8')
 
         start_time = time.time()
 
         n_samples = args.beam_size
         total_cost = 0.0
         logging.debug("Beam size: {}".format(n_samples))
+
         for i, line in enumerate(fsrc):
             if state['source_encoding'] == 'utf8':
                 seqin = line.strip().decode('utf-8')
             else:
                 seqin = line.strip()
             seq, parsed_in = parse_input(state, indx_word, seqin, idx2word=idict_src)
+
             if args.verbose:
                 print "Parsed Input:", parsed_in
             trans, costs, _ = sample(lm_model, seq, n_samples, sampler=sampler,
-                    beam_search=beam_search, ignore_unk=args.ignore_unk, normalize=args.normalize)
+                                     beam_search=beam_search, ignore_unk=args.ignore_unk,
+                                     probs_computer=probs_computer,
+                                     normalize=args.normalize)
+
             best = numpy.argmin(costs)
-            # hard coded utf8 output, this should use state 
             if state['target_encoding'] == 'utf8':
-                print >>ftrans, trans[best].encode('utf8').replace(" ","")
+                print >>ftrans, trans[best].decode('utf-8')
             else:
                 print >>ftrans, trans[best]
+
             if args.verbose:
                 if state['target_encoding'] == 'utf8':
-                    print "Translation:", trans[best].encode('utf8')
+                    print >>ftrans, trans[best].decode('utf-8')
                 else:
                     print "Translation:", trans[best]
+
             total_cost += costs[best]
+
             if (i + 1)  % 100 == 0:
                 ftrans.flush()
                 logger.debug("Current speed is {} per sentence".
                         format((time.time() - start_time) / (i + 1)))
+
         print "Total cost of the translations: {}".format(total_cost)
 
         fsrc.close()
@@ -300,6 +361,8 @@ def main():
                 seqin = raw_input('Input Sequence: ')
                 n_samples = int(raw_input('How many samples? '))
                 alpha = None
+                if state['source_encoding'] == 'utf8':
+                    seqin = seqin.decode('utf-8')
                 if not args.beam_search:
                     alpha = float(raw_input('Inverse Temperature? '))
                 seq,parsed_in = parse_input(state, indx_word, seqin, idx2word=idict_src)
@@ -309,10 +372,13 @@ def main():
                 traceback.print_exc()
                 continue
 
-            sample(lm_model, seq, n_samples, sampler=sampler,
-                    beam_search=beam_search,
-                    ignore_unk=args.ignore_unk, normalize=args.normalize,
-                    alpha=alpha, verbose=True)
+            sample(lm_model, seq, n_samples,
+                   sampler=sampler,
+                   beam_search=beam_search,
+                   ignore_unk=args.ignore_unk,
+                   normalize=args.normalize,
+                   probs_computer=probs_computer,
+                   alpha=alpha, verbose=True)
 
 if __name__ == "__main__":
     main()
