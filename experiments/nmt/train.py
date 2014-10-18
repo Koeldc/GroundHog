@@ -4,17 +4,22 @@ import argparse
 import cPickle
 import logging
 import pprint
-
+import re
 import numpy
+import time
 
+import ipdb
 
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
 from groundhog.trainer.SGD import SGD as SGD
 from groundhog.trainer.SGD_momentum import SGD as SGD_momentum
 from groundhog.mainLoop import MainLoop
 from experiments.nmt import\
-        RNNEncoderDecoder, prototype_search_state, get_batch_iterator
+        RNNEncoderDecoder, prototype_search_state, get_batch_iterator, sample,\
+        BeamSearch, parse_input 
 import experiments.nmt
+
+from subprocess import Popen, PIPE
 
 logger = logging.getLogger(__name__)
 
@@ -46,18 +51,122 @@ class RandomSamplePrinter(object):
                 if len(x_words) == 0:
                     continue
 
-                if self.state['source_encoding'] == "uft8":
-                    print u"Input: {}".format(" ".join(x_words))
-                elif self.state['source_encoding'] == "ascii":
-                    print "Input: {}".format(" ".join(x_words))
+                self.__print_samples("Input", x_words, self.state['source_encoding'])
+                self.__print_samples("Target", y_words, self.state['target_encoding'])
 
-                if self.state['target_encoding'] == "utf8":
-                    print u"Target: {}".format(" ".join(y_words))
-                elif self.state['target_encoding'] == "ascii":
-                    print "Target: {}".format(" ".join(y_words))
+                #if self.state['source_encoding'] == "uft8":
+                #    print u"Input: {}".format(" ".join(x_words))
+                #elif self.state['source_encoding'] == "ascii":
+                #    print "Input: {}".format(" ".join(x_words))
+
+                #if self.state['target_encoding'] == "utf8":
+                #    print u"Target: {}".format(" ".join(y_words))
+                #elif self.state['target_encoding'] == "ascii":
+                #    print "Target: {}".format(" ".join(y_words))
+
                 self.model.get_samples(self.state['seqlen'] + 1, self.state['n_samples'], x[:len(x_words)])
                 sample_idx += 1
+    def __print_samples(self, output_name, words, encoding):
+        if encoding == "utf8":
+            print u"{}: {}".format(output_name, " ".join(words))
+        elif encoding == "ascii":
+            print "{}: {}".format(output_name, " ".join(words))
+        else:
+            print "Unknown encoding {}".format(encoding)
 
+class BleuValidator(object):
+    """
+        Reads the validation set, 
+        computes the translations
+        
+    """
+    def __init__(self, state, lm_model,
+                beam_search, ignore_unk=False,
+                normalize=False, verbose=False):
+        """
+        TODO add some documentation 
+        """ 
+
+        # I should step in and see what this actually does.  
+        args = dict(locals())
+        args.pop('self')
+        self.__dict__.update(**args)
+        self.indx_word = cPickle.load(open(state['word_indx'],'rb'))
+        self.idict_src = cPickle.load(open(state['indx_word'],'r'))
+        self.n_samples = state['beam_size']
+        self.best_bleu = 0
+        self.val_bleu_curve = []
+        if state['target_encoding'] == 'utf8':
+            self.multibleu_cmd = ['perl', state['bleu_script'], '-char', state['validation_set_grndtruth'], '<'] 
+        else:
+            self.multibleu_cmd = ['perl', state['bleu_script'], state['validation_set_grndtruth'], '<'] 
+
+    def __call__(self): 
+        """
+        TODO add some documentation 
+        """ 
+
+        fsrc = open(self.state['validation_set'], 'r')
+        # An alternative is to write to a file and then have the multi_bleu script go there
+        #ftrans = open(self.state['validation_set_out'], 'w')
+ 
+        print "Started Validation: "
+        val_start_time = time.time()
+        mb_subprocess = Popen(self.multibleu_cmd, stdin=PIPE, stdout=PIPE) 
+        total_cost = 0.0
+        for i, line in enumerate(fsrc):
+            """
+            Load the sentence, retrieve the sample, write to file
+            """
+            if self.state['source_encoding'] == 'utf8':
+                seqin = line.strip().decode('utf-8')
+            else:
+                seqin = line.strip()
+            seq, parsed_in = parse_input(self.state, self.indx_word, seqin, idx2word=self.idict_src)
+            if self.verbose:
+                print "Parsed Input:", parsed_in
+            trans, costs, _ = sample(self.lm_model, seq, self.n_samples,
+                    beam_search=self.beam_search, ignore_unk=self.ignore_unk, normalize=self.normalize)
+            best = numpy.argmin(costs)
+            if self.state['target_encoding'] == 'utf8':
+                print >> mb_subprocess.stdin, trans[best].encode('utf8').replace(" ","")
+                #print >>ftrans, trans[best].encode('utf8').replace(" ","")
+                if self.verbose:
+                    print u"Translations: " + trans[best].encode('utf8').replace(" ","")
+            else:
+                print >> mb_subprocess.stdin, trans[best]
+                #print >>ftrans, trans[best]
+                if self.verbose:
+                    print "Translations: " + trans[best]
+         
+            total_cost += costs[best]
+            if i != 0 and i % 100 == 0:
+                print "Translated {} lines of validation set...".format(i)
+            mb_subprocess.stdin.flush()
+
+        print "Total cost of the validation: {}".format(total_cost)
+        fsrc.close()
+        # ftrans.close()
+        # send end of file, read output.        
+        mb_subprocess.stdin.close()
+        out_parse = re.match(r'BLEU = [-.0-9]+', mb_subprocess.stdout.readline())
+
+        print "Validation Took: {} minutes".format(float(time.time() - val_start_time)/60.)
+        
+        assert out_parse is not None
+
+        # extract the score
+        bleu_score = float(out_parse.group()[6:])
+        self.val_bleu_curve.append(bleu_score)                
+        print bleu_score
+
+        mb_subprocess.terminate()
+
+        # Determine whether or not we should save
+        if self.best_bleu < bleu_score:
+            self.best_bleu = bleu_score
+            return True
+        return False
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -72,7 +181,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # experiment.nmt has the fields of args.proto loaded in __init__.py
+    # this loads the state specified in the prototype 
     state = getattr(experiments.nmt, args.proto)()
     # this is based on the suggestion in the README.md in this foloder
     if args.state:
@@ -93,11 +202,15 @@ def main():
     # after this point lm is also embedded as a member of enc_dec
     lm_model = enc_dec.create_lm_model()
 
-    # if we are going to do early stopping with bleu, we'll need a beamsearch guy
-    #Import sample ----> make beamsearch guy --> do all the other jazz
-    
-    
-    #
+    # If we are going to use validation with the bleu script, we 
+    # will need early stopping 
+    bleu_validator = None
+    if state['bleu_script'] is not None and state['validation_set'] \
+        and state['validation_set_grndtruth']:
+        # make beam search       
+        beam_search = BeamSearch(enc_dec)
+        beam_search.compile()
+        bleu_validator = BleuValidator(state, lm_model, beam_search, verbose=False) 
 
     logger.debug("Load data")
     train_data = get_batch_iterator(state, rng)
@@ -108,9 +221,11 @@ def main():
     
     main = MainLoop(train_data, None, None, lm_model, algo, state, None,
             reset=state['reset'],
+            bleu_val_fn = bleu_validator, 
             hooks=[RandomSamplePrinter(state, lm_model, train_data)]
-                if state['hookFreq'] >= 0
+                if state['hookFreq'] >= 0 and state['validation_set'] is not None
                 else None)
+
     if state['reload']:
         main.load()
     if state['loopIters'] > 0:

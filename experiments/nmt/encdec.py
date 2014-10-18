@@ -683,6 +683,7 @@ class Encoder(EncoderDecoderBase):
             scale=self.state['weight_scale'])
 
         self._create_embedding_layers()
+        # these middle two functions are from the parent class. 
         self._create_transition_layers()
         # in the current implementation this doesn't do anything (but eventually
         # you could have a deep network here 
@@ -727,7 +728,9 @@ class Encoder(EncoderDecoderBase):
             (UNTESTED)
 
         :param approx_embeddings:
-            forces encoder to use given embeddings instead of its own
+            This argument specifies a given embedding the encoder must use,
+            in place of its own. (value of None therefore means implies use
+            of internal embedding)
 
         :param return_hidden_layers:
             if True, encoder returns all the activations of the hidden layer
@@ -1293,6 +1296,7 @@ class RNNEncoderDecoder(object):
         logger.debug("Create input variables")
 
         ### So since words are of a variable length it is necessary to do this. 
+        # These are the theano input variables. 
         self.x = TT.lmatrix('x')
         self.x_mask = TT.matrix('x_mask')
         self.y = TT.lmatrix('y')
@@ -1364,7 +1368,7 @@ class RNNEncoderDecoder(object):
         # Annotation for sampling
         sampling_c_components = []
 
-        ### this is used to build the sampler (to do dig into this code) 
+        ### this is used to build the sampler 
         logger.debug("Build sampling computation graph")
         self.sampling_x = TT.lvector("sampling_x")
         self.n_samples = TT.lscalar("n_samples")

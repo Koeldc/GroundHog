@@ -46,6 +46,7 @@ class MainLoop(object):
                  state,
                  channel,
                  hooks=None,
+                 bleu_val_fn=None,
                  reset=-1,
                  train_cost=False,
                  validate_postprocess=None,
@@ -78,6 +79,10 @@ class MainLoop(object):
         :type hooks: function or list of functions
         :param hooks: list of functions that are called every `hookFreq`
             steps to carry on various diagnostics
+
+        :type bleu_val_fn: function
+        :param bleu_val_fn: list of functions that are called every `bleu_val_frequency`
+            which generates translations for validation, and calls the evaluation script 
 
         :type reset: int
         :param reset: if larger than 0, the train_data iterator position is
@@ -149,7 +154,10 @@ class MainLoop(object):
         if self.channel is not None:
             self.channel.save()
 
+        # this is a hack and should be changed
+        self.bleu_val_fn = bleu_val_fn
         self.hooks = hooks
+
         self.reset = reset
 
         self.start_time = time.time()
@@ -336,6 +344,14 @@ class MainLoop(object):
                    self.step % self.state['hookFreq'] == 0 and \
                    self.hooks:
                     [fn() for fn in self.hooks]
+                
+                if self.state['bleu_val_frequency'] is not None and \
+                    self.step % self.state['bleu_val_frequency'] == 0 \
+                    and self.bleu_val_fn is not None and self.step > 0:
+                    if self.bleu_val_fn():
+                        self.model.save(self.state['prefix']+'best_bleu_'+'model.npz')                    
+                        numpy.savez(self.state['prefix'] + 'val_bleu_scores.npz', bleu_scores=self.bleu_val_fn.val_bleu_curve)
+
                 if self.reset > 0 and self.step > 1 and \
                    self.step % self.reset == 0:
                     print 'Resetting the data iterator'

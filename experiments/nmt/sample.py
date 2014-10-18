@@ -275,7 +275,6 @@ def main():
             trans, costs, _ = sample(lm_model, seq, n_samples, sampler=sampler,
                     beam_search=beam_search, ignore_unk=args.ignore_unk, normalize=args.normalize)
             best = numpy.argmin(costs)
-            # hard coded utf8 output, this should use state 
             if state['target_encoding'] == 'utf8':
                 print >>ftrans, trans[best].encode('utf8').replace(" ","")
             else:

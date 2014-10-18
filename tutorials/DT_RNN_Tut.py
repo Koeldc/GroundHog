@@ -297,7 +297,7 @@ def jobman(state, channel):
 if __name__=='__main__':
     state = {}
     # complete path to data (cluster specific)
-    state['seqlen'] = 100
+    state['seqlen'] = 101
     state['path']= "/data/lisa/data/PennTreebankCorpus/pentree_char_and_word.npz"
     state['dictionary']= "/data/lisa/data/PennTreebankCorpus/dictionaries.npz"
     state['chunks'] = 'chars'

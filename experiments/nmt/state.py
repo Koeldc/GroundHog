@@ -128,6 +128,22 @@ def prototype_phrase_state():
     # k for the maxout stage of output generation
     state['maxout_part'] = 2.
 
+    # ----- BLEU VALIDATION OPTIONS ----
+
+    # Location of the evaluation script
+    state['bleu_script'] = None
+    # Location of the validation set
+    state['validation_set'] = None
+     # Location of the validation set output
+    state['validation_set_out'] = None
+    # Location of what to compare the output translation to (gt)
+    state['validation_set_grndtruth'] = None
+    # Beam size during sampling
+    state['beam_size'] = None
+    # Number of steps between every validation
+    state['bleu_val_frequency'] = None
+
+
     # ----- WEIGHTS, INITIALIZATION -----
 
     # This one is bias applied in the recurrent layer. It is likely
@@ -202,7 +218,7 @@ def prototype_phrase_state():
     # Prefix for the model, state and timing files
     state['prefix'] = 'phrase_'
     # Specifies whether old model should be reloaded first
-    state['reload'] = True 
+    state['reload'] = False
     # When set to 0 each new model dump will be saved in a new file
     state['overwrite'] = 1
 
@@ -294,6 +310,40 @@ def prototype_search_state_zh_en_huge():
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/huge/encdec_30_zh_en_'
     return state
 
+def prototype_search_state_zh_en_small():
+    """
+    This prototype is for zh -> english 
+
+    The size is reduced to help prevent overfitting
+    """
+    state = prototype_encdec_state_zh_en()
+
+    #location of validation set
+    state['source'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5")
+    state['target'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5")
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+
+    state['dim'] = 800
+    # embedding dimensionality
+    state['rank_n_approx'] = 300
+
+    # validation set for early stopping
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_small_val.txt'
+    state['beam_size'] = 20
+    state['bleu_val_frequency'] = 3000
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_zh_en_small_'
+    return state
+
 def prototype_search_state_zh_en():
     """
     This prototype is for zh -> english 
@@ -313,6 +363,15 @@ def prototype_search_state_zh_en():
     state['dim'] = 1000
     # embedding dimensionality
     state['rank_n_approx'] = 600
+
+    # validation set for early stopping
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_val.txt'
+    state['beam_size'] = 20
+    state['bleu_val_frequency'] = 4000
 
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_zh_en_'
     return state
@@ -474,6 +533,38 @@ def prototype_search_state_zh_big():
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/encdec_30_big_'
     return state
 
+def prototype_search_state_zh_big_cv():
+    """
+    This prototype integrates the search model into the translation with a larger size
+    
+    This model uses cross validation
+    """
+    state = prototype_encdec_state_zh()
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+
+    state['dim'] = 1500
+    # embedding dimensionality
+    state['rank_n_approx'] = 800
+
+    # validation set for early stopping
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/encdec_30_small_val.txt'
+    state['beam_size'] = 30
+    state['bleu_val_frequency'] = 4500
+
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/encdec_30_big_cv_'
+    return state
+
+
 # original configs
 
 def prototype_encdec_state():
@@ -525,11 +616,11 @@ def prototype_search_state():
     state['prefix'] = 'search_'
     return state
 
-def prototype_test():
+def prototype_search_state_zh_en_test():
     """
-    This is just some testing 
+    This prototype is for zh -> english 
     """
-    state = prototype_encdec_state_zh()
+    state = prototype_encdec_state_zh_en()
 
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
@@ -537,21 +628,19 @@ def prototype_test():
     state['forward'] = True
     state['backward'] = True
 
-    # overwrite this from above
-    # Source and target sentence
-    state['target'] = ["/data/lisatmp3/xukelvin/translation/en-zh/openmt/binarized_text.zh.shuf.h5"]
-    state['source'] = ["/data/lisatmp3/xukelvin/translation/en-zh/openmt/binarized_text.en.shuf.h5"]
-    # Word -> Id and Id-> Word Dictionaries
-    state['indx_word'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/ivocab.en.pkl"
-    state['indx_word_target'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/ivocab.zh.pkl"
-    state['word_indx'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/vocab.en.pkl"
-    state['word_indx_trgt'] = "/data/lisatmp3/xukelvin/translation/en-zh/openmt/vocab.zh.pkl"   
-
     state['dim'] = 1000
     # embedding dimensionality
-    state['rank_n_approx'] = 200
+    state['rank_n_approx'] = 600
+    
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/tmp/val_out.txt'
+    state['beam_size'] = 1
+    state['bleu_val_frequency'] = 1
 
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/test/test_test_'
+    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/test_'
     return state
 
 
