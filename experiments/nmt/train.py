@@ -8,14 +8,12 @@ import re
 import numpy
 import time
 
-import ipdb
-
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
 from groundhog.trainer.SGD import SGD as SGD
 from groundhog.trainer.SGD_momentum import SGD as SGD_momentum
 from groundhog.mainLoop import MainLoop
 from experiments.nmt import\
-        RNNEncoderDecoder, prototype_search_state, get_batch_iterator, sample,\
+        RNNEncoderDecoder, prototype_state, get_batch_iterator, sample,\
         BeamSearch, parse_input 
 import experiments.nmt
 
