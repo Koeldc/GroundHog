@@ -121,6 +121,25 @@ def prototype_state():
     state['weight_init_fn'] = 'sample_weights_classic'
     state['weight_scale'] = 0.01
 
+    # ----- BLEU VALIDATION OPTIONS ----
+
+    # Location of the evaluation script
+    state['bleu_script'] = None
+    # Location of the validation set
+    state['validation_set'] = None
+    # boolean, whether or not to write the validation set to file    
+    state['output_validation_set'] = False
+    # Location of the validation set output, if different
+    # fom default
+    state['validation_set_out'] = None
+    # Location of what to compare the output translation to (gt)
+    state['validation_set_grndtruth'] = None
+    # Beam size during sampling
+    state['beam_size'] = None
+    # Number of steps between every validation
+    state['bleu_val_frequency'] = None
+
+
     # ---- REGULARIZATION -----
 
     # WARNING: dropout is not tested and probably does not work.
