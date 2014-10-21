@@ -350,7 +350,7 @@ class MainLoop(object):
                     and self.bleu_val_fn is not None and self.step > 0:
                     if self.bleu_val_fn():
                         self.model.save(self.state['prefix']+'best_bleu_'+'model.npz')                    
-                        numpy.savez(self.state['prefix'] + 'val_bleu_scores.npz', bleu_scores=self.bleu_val_fn.val_bleu_curve)
+                    numpy.savez(self.state['prefix'] + 'val_bleu_scores.npz', bleu_scores=self.bleu_val_fn.val_bleu_curve)
 
                 if self.reset > 0 and self.step > 1 and \
                    self.step % self.reset == 0:

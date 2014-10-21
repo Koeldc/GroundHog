@@ -134,7 +134,10 @@ def prototype_phrase_state():
     state['bleu_script'] = None
     # Location of the validation set
     state['validation_set'] = None
-     # Location of the validation set output
+    # boolean, whether or not to write the validation set to file    
+    state['output_validation_set'] = False
+    # Location of the validation set output, if different
+    # fom default
     state['validation_set_out'] = None
     # Location of what to compare the output translation to (gt)
     state['validation_set_grndtruth'] = None
@@ -283,18 +286,16 @@ def prototype_encdec_state_zh_en():
 
     return state
 
-def prototype_search_state_zh_en_huge():
+def prototype_search_state_zh_en_3000_600():
     """
     This prototype is for zh-> with a large hidden state 
     
     This was used once but it was determined that a smaller
     model overfit a lot 
+
+    Testing with validation set 
     """
     state = prototype_encdec_state_zh_en()
-
-    #location of validation set
-    state['source'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5")
-    state['target'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5")
 
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
@@ -302,12 +303,21 @@ def prototype_search_state_zh_en_huge():
     state['forward'] = True
     state['backward'] = True
 
-    state['dim'] = 4000
+    state['dim'] = 3000
     # embedding dimensionality
-    state['rank_n_approx'] = 800
-    state['seqlen'] = 30
+    state['rank_n_approx'] = 600
+    state['seqlen'] = 50
 
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/huge/encdec_30_zh_en_'
+    # validation set for early stopping
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    #state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_small_val.txt'
+    state['beam_size'] = 10
+    state['bleu_val_frequency'] = 5000
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/huge/encdec_50_zh_en_3000_600_'
     return state
 
 def prototype_search_state_zh_en_small():
@@ -374,7 +384,6 @@ def prototype_search_state_zh_en():
     state['bleu_val_frequency'] = 4000
 
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_zh_en_'
-    return state
 
 # en -> zh
 
@@ -556,7 +565,7 @@ def prototype_search_state_zh_big_cv():
     state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
     state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
     state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
-    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/encdec_30_small_val.txt'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/encdec_30_big_cv_.txt'
     state['beam_size'] = 30
     state['bleu_val_frequency'] = 4500
 

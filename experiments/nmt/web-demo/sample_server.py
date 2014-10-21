@@ -88,7 +88,7 @@ class Sampler:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-            "Sample (of find with beam-serch) translations from a translation model")
+            "Sample (or find with beam-search) translations from a translation model")
     parser.add_argument("--port", help="Port to use", type=int, default=8888)
     parser.add_argument("--state", help="State to use")
     parser.add_argument("--beam-search",

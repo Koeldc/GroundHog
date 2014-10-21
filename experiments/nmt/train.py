@@ -76,44 +76,81 @@ class RandomSamplePrinter(object):
 
 class BleuValidator(object):
     """
-        Reads the validation set, 
-        computes the translations
-        
+    Object that evaluates the bleu score on the validation set.
+    Opens the subprocess to run the validation script, and 
+    keeps track of the bleu scores over time  
     """
     def __init__(self, state, lm_model,
                 beam_search, ignore_unk=False,
                 normalize=False, verbose=False):
         """
-        TODO add some documentation 
+        Handles normal book-keeping of state variables,
+        but also reloads the bleu scores if they exists
+
+        :param state:
+            a state in the usual groundhog sense
+        :param lm_model:
+            a groundhog language model 
+        :param beam_search:
+            beamsearch object used for sampling
+        :param ignore_unk
+            whether or not to ignore unknown characters
+        :param normalize
+            whether or not to normalize the score by the length
+            of the sentence
+        :param verbose
+            whether or not to also write the ranslation to the file 
+            specified by validation_set_out
+
         """ 
 
         # I should step in and see what this actually does.  
         args = dict(locals())
         args.pop('self')
         self.__dict__.update(**args)
+
         self.indx_word = cPickle.load(open(state['word_indx'],'rb'))
         self.idict_src = cPickle.load(open(state['indx_word'],'r'))
         self.n_samples = state['beam_size']
         self.best_bleu = 0
+
         self.val_bleu_curve = []
+        if state['reload']: 
+            try:
+                bleu_score = numpy.load(state['prefix'] + 'val_bleu_scores.npz')
+                self.val_bleu_curve = bleu_score['bleu_scores'].tolist()
+                print "BleuScores Reloaded"
+            except:
+                print "BleuScores not Found"
+
+        # for utf8, we assume that we are interested in character based bleu, this might not be
         if state['target_encoding'] == 'utf8':
             self.multibleu_cmd = ['perl', state['bleu_script'], '-char', state['validation_set_grndtruth'], '<'] 
         else:
             self.multibleu_cmd = ['perl', state['bleu_script'], state['validation_set_grndtruth'], '<'] 
 
+        if verbose:
+            if 'validation_set_out' not in state.keys():
+                self.state['validation_set_out'] = state['prefix'] + 'validation_out.txt'
+
     def __call__(self): 
         """
-        TODO add some documentation 
+        Opens the file for the validation set and creates a subprocess 
+        for the multi-bleu script. 
+
+        Returns a boolean indicating whether the current model should
+        be saved. 
         """ 
 
-        fsrc = open(self.state['validation_set'], 'r')
-        # An alternative is to write to a file and then have the multi_bleu script go there
-        #ftrans = open(self.state['validation_set_out'], 'w')
- 
         print "Started Validation: "
         val_start_time = time.time()
+        fsrc = open(self.state['validation_set'], 'r')
         mb_subprocess = Popen(self.multibleu_cmd, stdin=PIPE, stdout=PIPE) 
         total_cost = 0.0
+
+        if self.verbose:
+            ftrans = open(self.state['validation_set_out'], 'w')
+        
         for i, line in enumerate(fsrc):
             """
             Load the sentence, retrieve the sample, write to file
@@ -123,43 +160,47 @@ class BleuValidator(object):
             else:
                 seqin = line.strip()
             seq, parsed_in = parse_input(self.state, self.indx_word, seqin, idx2word=self.idict_src)
-            if self.verbose:
-                print "Parsed Input:", parsed_in
+
+            # draw sample, checking to ensure we don't get an empty string back
             trans, costs, _ = sample(self.lm_model, seq, self.n_samples,
                     beam_search=self.beam_search, ignore_unk=self.ignore_unk, normalize=self.normalize)
-            best = numpy.argmin(costs)
+            try:
+                best = numpy.argmin(costs)
+                total_cost += costs[best]
+                trans_out = trans[best]
+            except ValueError:  
+                print "Could not fine a translation for line: {}".format(i+1)
+                trans_out = u'UNK' if self.state['target_encoding'] == 'utf8' else 'UNK'
+            
+            # Write to subprocess and file if it exists
             if self.state['target_encoding'] == 'utf8':
-                print >> mb_subprocess.stdin, trans[best].encode('utf8').replace(" ","")
-                #print >>ftrans, trans[best].encode('utf8').replace(" ","")
+                print >> mb_subprocess.stdin, trans_out.encode('utf8').replace(" ","")
                 if self.verbose:
-                    print u"Translations: " + trans[best].encode('utf8').replace(" ","")
+                    print  >> ftrans, trans_out.encode('utf8').replace(" ","")
             else:
-                print >> mb_subprocess.stdin, trans[best]
-                #print >>ftrans, trans[best]
+                print >> mb_subprocess.stdin, trans_out
                 if self.verbose:
-                    print "Translations: " + trans[best]
+                    print >> ftrans, trans_out
          
-            total_cost += costs[best]
-            if i != 0 and i % 100 == 0:
+            if i != 0 and i % 50 == 0:
                 print "Translated {} lines of validation set...".format(i)
             mb_subprocess.stdin.flush()
 
         print "Total cost of the validation: {}".format(total_cost)
         fsrc.close()
-        # ftrans.close()
+        if self.verbose:
+            ftrans.close()
+
         # send end of file, read output.        
         mb_subprocess.stdin.close()
         out_parse = re.match(r'BLEU = [-.0-9]+', mb_subprocess.stdout.readline())
-
-        print "Validation Took: {} minutes".format(float(time.time() - val_start_time)/60.)
-        
+        print "Validation Took: {} minutes".format(float(time.time() - val_start_time)/60.) 
         assert out_parse is not None
 
         # extract the score
         bleu_score = float(out_parse.group()[6:])
         self.val_bleu_curve.append(bleu_score)                
-        print bleu_score
-
+        print bleu_score     
         mb_subprocess.terminate()
 
         # Determine whether or not we should save
@@ -210,7 +251,7 @@ def main():
         # make beam search       
         beam_search = BeamSearch(enc_dec)
         beam_search.compile()
-        bleu_validator = BleuValidator(state, lm_model, beam_search, verbose=False) 
+        bleu_validator = BleuValidator(state, lm_model, beam_search, verbose=state['output_validation_set']) 
 
     logger.debug("Load data")
     train_data = get_batch_iterator(state, rng)

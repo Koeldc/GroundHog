@@ -13,7 +13,7 @@ from state import\
     prototype_search_state_zh_en,\
     prototype_search_state_zh_en_small,\
     prototype_search_state_zh_en_test,\
-    prototype_search_state_zh_en_huge,\
+    prototype_search_state_zh_en_3000_600,\
     prototype_search_state_zh_small,\
     prototype_search_state_zh_big,\
     prototype_search_state_zh_big_cv,\
