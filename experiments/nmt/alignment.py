@@ -19,8 +19,8 @@ from experiments.nmt import\
 
 # this is done to avoid interactive plotting
 # while running without -X forwarding 
-#import matplotlib
-#matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 
 import pylab
 
@@ -167,6 +167,7 @@ def sample(lm_model, seq, n_samples,
             counts = [len(s) for s in trans]
             costs = [co / cn for co, cn in zip(costs, counts)]
 
+        import ipdb; ipdb.set_trace()
         for i in range(len(trans)):
             sen = indices_to_words(lm_model.word_indxs, trans[i])
             src_sen = indices_to_words(lm_model.word_indxs_src, seq)
@@ -182,7 +183,7 @@ def sample(lm_model, seq, n_samples,
             pylab.yticks([i for i in range(len(sen))], [j for j in sen])
             pylab.xticks([i for i in range(len(seq))], [c for char in src_sen for c in char ])
             pylab.gray()
-            pylab.imshow(alignments, interpolation="none")
+            #pylab.imshow(alignments, interpolation="none")
             pylab.savefig("alignments_%d.png" % i)
 
         for i in range(len(costs)):
