@@ -5,6 +5,7 @@ from encdec import create_padded_batch
 
 
 from state import\
+    prototype_state,\
     prototype_phrase_state,\
     prototype_encdec_state,\
     prototype_encdec_state_zh,\
