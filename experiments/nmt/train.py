@@ -102,7 +102,6 @@ class BleuValidator(object):
 
         """ 
 
-        # I should step in and see what this actually does.  
         args = dict(locals())
         args.pop('self')
         self.__dict__.update(**args)
@@ -238,14 +237,13 @@ def main():
     rng = numpy.random.RandomState(state['seed'])
     enc_dec = RNNEncoderDecoder(state, rng, args.skip_init)
     enc_dec.build()
-    # after this point lm is also embedded as a member of enc_dec
     lm_model = enc_dec.create_lm_model()
 
     # If we are going to use validation with the bleu script, we 
     # will need early stopping 
     bleu_validator = None
-    if state['bleu_script'] is not None and state['validation_set'] \
-        and state['validation_set_grndtruth']:
+    if state['bleu_script'] is not None and state['validation_set'] is not None\
+        and state['validation_set_grndtruth'] is not None:
         # make beam search       
         beam_search = BeamSearch(enc_dec)
         beam_search.compile()
