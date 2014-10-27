@@ -167,7 +167,6 @@ def sample(lm_model, seq, n_samples,
             counts = [len(s) for s in trans]
             costs = [co / cn for co, cn in zip(costs, counts)]
 
-        import ipdb; ipdb.set_trace()
         for i in range(len(trans)):
             sen = indices_to_words(lm_model.word_indxs, trans[i])
             src_sen = indices_to_words(lm_model.word_indxs_src, seq)

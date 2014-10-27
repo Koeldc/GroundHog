@@ -154,7 +154,6 @@ class MainLoop(object):
         if self.channel is not None:
             self.channel.save()
 
-        # this is a hack and should be changed
         self.bleu_val_fn = bleu_val_fn
         self.hooks = hooks
 

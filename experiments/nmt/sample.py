@@ -8,7 +8,6 @@ import time
 import sys
 
 import numpy
-import ipdb
 
 import experiments.nmt
 from experiments.nmt import\

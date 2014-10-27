@@ -119,9 +119,9 @@ class BleuValidator(object):
             try:
                 bleu_score = numpy.load(state['prefix'] + 'val_bleu_scores.npz')
                 self.val_bleu_curve = bleu_score['bleu_scores'].tolist()
-                print "BleuScores Reloaded"
+                logger.debug("BleuScores Reloaded")
             except:
-                print "BleuScores not Found"
+                logger.debug("BleuScores not Found")
 
         # for utf8, we assume that we are interested in character based bleu, this might not be
         if state['target_encoding'] == 'utf8':
@@ -182,7 +182,7 @@ class BleuValidator(object):
                 if self.verbose:
                     print >> ftrans, trans_out
          
-            if i != 0 and i % 50 == 0:
+            if i != 0 and i % 100 == 0:
                 print "Translated {} lines of validation set...".format(i)
             mb_subprocess.stdin.flush()
 
@@ -246,8 +246,8 @@ def main():
     # If we are going to use validation with the bleu script, we 
     # will need early stopping 
     bleu_validator = None
-    if state['bleu_script'] is not None and state['validation_set'] \
-        and state['validation_set_grndtruth']:
+    if state['bleu_script'] is not None and state['validation_set'] is not None \
+        and state['validation_set_grndtruth'] is not None:
         # make beam search       
         beam_search = BeamSearch(enc_dec)
         beam_search.compile()

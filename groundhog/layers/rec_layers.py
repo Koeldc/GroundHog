@@ -1068,6 +1068,7 @@ class RecurrentLayer(Layer):
 
         # Reset gate:
         # optionally reset the hidden state.
+
         if self.reseting and reseter_below:
             reseter = self.reseter_activation(TT.dot(state_before, R_hh) +
                     reseter_below)

@@ -339,13 +339,17 @@ class RecurrentLayerWithSearch(Layer):
             the bias as well
         """
 
+
         updater_below = gater_below
 
         W_hh = self.W_hh
         G_hh = self.G_hh
         R_hh = self.R_hh
+        # Used for calculating p_from_c if not available.
         A_cp = self.A_cp
+        # for calculating p_from_h
         B_hp = self.B_hp
+        # This is a scaling for the non-linearity, v_a^T in (Bahdahnau et al 2014)  
         D_pe = self.D_pe
 
         # The code works only with 3D tensors
@@ -453,12 +457,14 @@ class RecurrentLayerWithSearch(Layer):
                 updater_below = updater_below.reshape((nsteps, batch_size, self.n_in))
             if reseter_below:
                 reseter_below = reseter_below.reshape((nsteps, batch_size, self.n_in))
-
         if not init_state:
             if not isinstance(batch_size, int) or batch_size != 1:
                 init_state = TT.alloc(floatX(0), batch_size, self.n_hids)
             else:
                 init_state = TT.alloc(floatX(0), self.n_hids)
+
+        # this is p from h from the paper (the second term in the e_ij equation that
+        # doesn't need to be constantly recalculated. 
 
         p_from_c =  utils.dot(c, self.A_cp).reshape(
                 (c.shape[0], c.shape[1], self.n_hids))
@@ -641,6 +647,7 @@ class EncoderDecoderBase(object):
         if rec_layer == RecurrentLayerWithSearch:
             add_args = dict(c_dim=self.state['c_dim'])
         for level in range(self.num_levels):
+            # calls init on the rec_layer and puts it in the list 
             self.transitions.append(rec_layer(
                     self.rng,
                     n_hids=self.state['dim'],
@@ -685,6 +692,7 @@ class Encoder(EncoderDecoderBase):
 
         self._create_embedding_layers()
         # these middle two functions are from the parent class. 
+        # but differ based upon what is read from the state variable. 
         self._create_transition_layers()
         # in the current implementation this doesn't do anything (but eventually
         # you could have a deep network here 
@@ -838,13 +846,24 @@ class Decoder(EncoderDecoderBase):
             weight_noise=self.state['weight_noise'],
             scale=self.state['weight_scale'])
 
+        # the embedding layer takes the produced outputs
+        # re-embeds them. 
         self._create_embedding_layers()
+        # recurrent layer with search
         self._create_transition_layers()
+        # in the current setting this doesn't do anything
         self._create_inter_level_layers()
+        # mini-mlp that initializes the first hidden layer. 
         self._create_initialization_layers()
+        # this takes the context vector to compute next decoder state
         self._create_decoding_layers()
+        # softmax output
         self._create_readout_layers()
 
+        # sets the function that will be applied to the context vector
+        # in the step_fprop of RecurrentLayerWithSearch
+        # when we are in search mode, we have needs for these
+        # gates
         if self.state['search']:
             assert self.num_levels == 1
             self.transitions[0].set_decoding_layers(
@@ -854,6 +873,7 @@ class Decoder(EncoderDecoderBase):
 
     def _create_initialization_layers(self):
         logger.debug("_create_initialization_layers")
+        # zero layer is just a dummy layer that outputs zero 
         self.initializers = [ZeroLayer()] * self.num_levels
         if self.state['bias_code']:
             for level in range(self.num_levels):
@@ -867,6 +887,9 @@ class Decoder(EncoderDecoderBase):
                     **self.default_kwargs)
 
     def _create_decoding_layers(self):
+        """
+        This layer is called on c, which is the state provided by the encoder
+        """
         logger.debug("_create_decoding_layers")
         self.decode_inputers = [lambda x : 0] * self.num_levels
         self.decode_reseters = [lambda x : 0] * self.num_levels
@@ -931,6 +954,7 @@ class Decoder(EncoderDecoderBase):
                 name='{}_hid_readout_{}'.format(self.prefix, level),
                 **readout_kwargs)
 
+        # connection from previous work to current
         self.prev_word_readout = 0
         if self.state['bigram']:
             self.prev_word_readout = MultiLayer(
@@ -942,6 +966,7 @@ class Decoder(EncoderDecoderBase):
                 name='{}_prev_readout_{}'.format(self.prefix, level),
                 **self.default_kwargs)
 
+        # turns on intermediate maxout layer
         if self.state['deep_out']:
             act_layer = UnaryOp(activation=eval(self.state['unary_activ']))
             drop_layer = DropOp(rng=self.rng, dropout=self.state['dropout'])
@@ -1030,7 +1055,7 @@ class Decoder(EncoderDecoderBase):
                 assert step_num
                 c_pos = TT.minimum(step_num, c.shape[0] - 1)
 
-        # Low rank embeddings of all the input words.
+        # Low rank embeddings of all the target words.
         # Shape if mode == evaluation
         #   (n_words, rank_n_approx),
         # Shape if mode != evaluation
@@ -1049,9 +1074,9 @@ class Decoder(EncoderDecoderBase):
         update_signals = []
         for level in range(self.num_levels):
             # Contributions directly from input words.
-            input_signals.append(self.input_embedders[level](approx_embeddings))
-            update_signals.append(self.update_embedders[level](approx_embeddings))
-            reset_signals.append(self.reset_embedders[level](approx_embeddings))
+            input_signals.append(self.input_embedders[level](approx_embeddings)) # E * \tilde(s)_i
+            update_signals.append(self.update_embedders[level](approx_embeddings)) # z_i
+            reset_signals.append(self.reset_embedders[level](approx_embeddings)) # r_i
 
             # Contributions from the encoded source sentence.
             if not self.state['search']:
@@ -1065,6 +1090,8 @@ class Decoder(EncoderDecoderBase):
         #   (batch_size, dim)
         # Shape if mode != evaluation:
         #   (n_samples, dim)
+        # This is how we get the first s_0
+        
         init_states = given_init_states
         if not init_states:
             init_states = []
@@ -1086,6 +1113,7 @@ class Decoder(EncoderDecoderBase):
                 input_signals[level] += self.inputers[level](hidden_layers[level - 1])
                 update_signals[level] += self.updaters[level](hidden_layers[level - 1])
                 reset_signals[level] += self.reseters[level](hidden_layers[level - 1])
+            # pass in init_states through kwargs for fprop
             add_kwargs = (dict(state_before=init_states[level])
                         if mode != Decoder.EVALUATION
                         else dict(init_state=init_states[level],
@@ -1093,10 +1121,13 @@ class Decoder(EncoderDecoderBase):
                             nsteps=y.shape[0]))
             if self.state['search']:
                 add_kwargs['c'] = c
+                # c_mask and x_mask should be the same
                 add_kwargs['c_mask'] = c_mask
                 add_kwargs['return_alignment'] = self.compute_alignment
                 if mode != Decoder.EVALUATION:
                     add_kwargs['step_num'] = step_num
+            # context is added through in add_kwargs, the recurrence
+            # relation is defined inside the call. 
             result = self.transitions[level](
                     input_signals[level],
                     mask=y_mask,
@@ -1107,13 +1138,16 @@ class Decoder(EncoderDecoderBase):
                     **add_kwargs)
             if self.state['search']:
                 if self.compute_alignment:
-                    #This implicitly wraps each element of result.out with a Layer to keep track of the parameters.
+                    # This implicitly wraps each element of result.out with a
+                    # Layer to keep track of the parameters.
                     #It is equivalent to h=result[0], ctx=result[1] etc. 
+                    # h -> is s in the paper. 
                     h, ctx, alignment = result
                     if mode == Decoder.EVALUATION:
                         alignment = alignment.out
                 else:
-                    #This implicitly wraps each element of result.out with a Layer to keep track of the parameters.
+                    # This implicitly wraps each element of result.out with a 
+                    # Layer to keep track of the parameters.
                     #It is equivalent to h=result[0], ctx=result[1]
                     h, ctx = result
             else:
@@ -1337,7 +1371,8 @@ class RNNEncoderDecoder(object):
                 skip_init=self.skip_init)
         self.backward_encoder.create_layers()
 
-        # this big computation graphy is built (they do it backwards)
+        # this big computation graph is built (they do it backwards)
+        # not we force to approx_embedder to be the same
         logger.debug("Build backward encoding computation graph")
         backward_training_c = self.backward_encoder.build_encoder(
                 self.x[::-1],
@@ -1369,7 +1404,10 @@ class RNNEncoderDecoder(object):
                 skip_init=self.skip_init, compute_alignment=self.compute_alignment)
         self.decoder.create_layers()
         logger.debug("Build log-likelihood computation graph")
-        # dimensions go (time, example id, dimension) we are concatenating over dimensions [hj_forward; hj_backward] 
+        # dimensions go (time, example id, dimension) we are concatenating over
+        # 'dimension' [hj_forward; hj_backward] 
+        # concantenate is implemented layer object whose fprop just concatenates
+        # the arg. 
         self.predictions, self.alignment = self.decoder.build_decoder(
                 c=Concatenate(axis=2)(*training_c_components), c_mask=self.x_mask,
                 y=self.y, y_mask=self.y_mask)
@@ -1401,12 +1439,12 @@ class RNNEncoderDecoder(object):
             sampling_c_components.append(ReplicateLayer(self.sampling_x.shape[0])
                     (self.backward_sampling_c[0]))
 
+        # TODO: explain why we concatenate over axis = 1 
         self.sampling_c = Concatenate(axis=1)(*sampling_c_components).out
         (self.sample, self.sample_log_prob), self.sampling_updates =\
             self.decoder.build_sampler(self.n_samples, self.n_steps, self.T,
                     c=self.sampling_c)
 
-        ### KelvinXu
         logger.debug("Create auxiliary variables")
         self.c = TT.matrix("c")
         self.step_num = TT.lscalar("step_num")
