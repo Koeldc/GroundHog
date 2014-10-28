@@ -866,14 +866,15 @@ class Decoder(EncoderDecoderBase):
         # gates
         if self.state['search']:
             assert self.num_levels == 1
-            self.transitions[0].set_decoding_layers(
-                    self.decode_inputers[0],
-                    self.decode_reseters[0],
-                    self.decode_updaters[0])
+            for level in range(self.num_levels):
+                self.transitions[level].set_decoding_layers(
+                        self.decode_inputers[level],
+                        self.decode_reseters[level],
+                        self.decode_updaters[level])
 
     def _create_initialization_layers(self):
         logger.debug("_create_initialization_layers")
-        # zero layer is just a dummy layer that outputs zero 
+        # zero layer is just a dummy layer that outputs zero of the input size
         self.initializers = [ZeroLayer()] * self.num_levels
         if self.state['bias_code']:
             for level in range(self.num_levels):
@@ -1191,6 +1192,7 @@ class Decoder(EncoderDecoderBase):
                 read_from = read_from_var
             readout += self.hidden_readouts[level](read_from)
         if self.state['bigram']:
+            # what is going on here (Kelvin Xu)
             if mode != Decoder.EVALUATION:
                 check_first_word = (y > 0
                     if self.state['check_first_word']
@@ -1396,6 +1398,7 @@ class RNNEncoderDecoder(object):
         if self.state['last_backward']:
             training_c_components.append(ReplicateLayer(self.x.shape[0])
                     (backward_training_c[0]))
+        # since c since the concatenation of two encoders
         self.state['c_dim'] = len(training_c_components) * self.state['dim']
 
         # Decoder creation section 

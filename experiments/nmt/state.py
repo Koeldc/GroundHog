@@ -71,6 +71,7 @@ def prototype_phrase_state():
     # Turns on initialization of the first hidden state from the annotations
     state['bias_code'] = True
     # Turns on using the context to compute the next Decoder state
+    # What is meant by the context here? 
     state['decoding_inputs'] = True
     # Turns on an intermediate maxout layer in the output
     state['deep_out'] = True
@@ -522,6 +523,36 @@ def prototype_search_state_zh_huge():
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/huge/encdec_30_huge_'
     return state
 
+def prototype_search_state_zh_big_control():
+    """
+    This model tries to acertain if training with 30 -> 50 is good or bad. 
+    """
+    state = prototype_encdec_state_zh()
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+
+    state['dim'] = 1500
+    # embedding dimensionality
+    state['rank_n_approx'] = 800
+
+    # validation set for early stopping
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/control/encdec_50_big_control.txt'
+    state['beam_size'] = 30
+    state['bleu_val_frequency'] = 5000
+
+    state['seqlen'] = 50
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/control/encdec_50_big_control_'
+    return state
+
 
 def prototype_search_state_zh_big():
     """
@@ -623,6 +654,38 @@ def prototype_search_state():
     state['seqlen'] = 50
     state['sort_k_batches'] = 20
     state['prefix'] = 'search_'
+    return state
+
+def prototype_search_state_zh_en_multi_attention():
+    """
+    This prototype is for zh -> english 
+    """
+    state = prototype_encdec_state_zh_en()
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+
+    # testing multi attention mechanism
+    # it appears that'd it be way better to just modify the encoder part of the code
+    state['decoder_stack'] = 1
+
+    state['dim'] = 1000
+    # embedding dimensionality
+    state['rank_n_approx'] = 600
+    
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/multi-attention/val_out.txt'
+    state['beam_size'] = 1
+    state['bleu_val_frequency'] = 4000
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/multi-attention/test_'
+
     return state
 
 def prototype_search_state_zh_en_test():
