@@ -569,6 +569,8 @@ def prefix_lookup(state, p, s):
         return state['%s_%s'%(p, s)]
     return state[s]
 
+
+
 class EncoderDecoderBase(object):
 
     def _create_embedding_layers(self):
@@ -703,6 +705,7 @@ class Encoder(EncoderDecoderBase):
         logger.debug("_create_representation_layers")
         # If we have a stack of RNN, then their last hidden states
         # are combined with a maxout layer.
+        # for shallow nets this is not used at all
         self.repr_contributors = [None] * self.num_levels
         for level in range(self.num_levels):
             self.repr_contributors[level] = MultiLayer(
@@ -791,7 +794,7 @@ class Encoder(EncoderDecoderBase):
             assert self.state['encoder_stack'] == 1
             return hidden_layers[0]
 
-        # If we no stack of RNN but only a usual one,
+        # If we don't stack of RNN but only a usual one,
         # then the last hidden state is used as a representation.
         # Return value shape in case of matrix input:
         #   (batch_size, dim)
@@ -891,7 +894,7 @@ class Decoder(EncoderDecoderBase):
         """
         This layer is called on c, which is the state provided by the encoder
         """
-        logger.debug("_create_decoding_layers")
+        logger.debug("_create_intermediate_decoding_layers")
         self.decode_inputers = [lambda x : 0] * self.num_levels
         self.decode_reseters = [lambda x : 0] * self.num_levels
         self.decode_updaters = [lambda x : 0] * self.num_levels
@@ -1097,6 +1100,7 @@ class Decoder(EncoderDecoderBase):
         if not init_states:
             init_states = []
             for level in range(self.num_levels):
+                # we only take the backward component
                 init_c = c[0, :, -self.state['dim']:]
                 init_states.append(self.initializers[level](init_c))
 
@@ -1401,6 +1405,12 @@ class RNNEncoderDecoder(object):
         # since c since the concatenation of two encoders
         self.state['c_dim'] = len(training_c_components) * self.state['dim']
 
+        self.intermediate = Intermediate(self.state, self.rng, compute_alignment=True)
+        intermediate = self.intermediate.build_intermediate(c=Concatenate(axis=2)(*training_c_components),
+                                                            c_mask=self.x_mask) 
+                                                            
+        import ipdb; ipdb.set_trace()
+
         # Decoder creation section 
         logger.debug("Create decoder")
         self.decoder = Decoder(self.state, self.rng,
@@ -1584,3 +1594,183 @@ def parse_input(state, word2idx, line, raise_unk=False, idx2word=None, unk_sym=-
 
     return seq, seqin
 
+class Intermediate(EncoderDecoderBase):
+    """
+    Intermediate Layer that is just a Recurrent Layer 
+    With search
+
+    Kelvin 10/2015
+    """
+
+    EVALUATION = 0
+    SAMPLING = 1
+    BEAM_SEARCH = 2
+
+    def __init__(self, state, rng, prefix='inter',
+            skip_init=False, compute_alignment=False):
+        self.state = state
+        self.rng = rng
+        self.prefix = prefix
+        self.skip_init = skip_init
+        self.compute_alignment = compute_alignment
+
+        # TODO: make this deep
+        self.num_levels = 1
+
+    def create_layers(self):
+        self.default_kwargs = dict(
+            init_fn=self.state['weight_init_fn'] if not self.skip_init else "sample_zeros",
+            weight_noise=self.state['weight_noise'],
+            scale=self.state['weight_scale'])
+
+        # recurrent layer with search
+        self._create_transition_layers()
+        # in the current setting this doesn't do anything
+        # mini-mlp that initializes the first hidden layer. 
+        self._create_initialization_layers()
+        # this takes the context vector to compute next decoder state
+        self._create_decoding_layers()
+
+        # sets the function that will be applied to the context vector
+        # in the step_fprop of RecurrentLayerWithSearch
+        # when we are in search mode, we have needs for these gate
+
+        if self.state['search']:
+            assert self.num_levels == 1
+            for level in range(self.num_levels):
+                self.transitions[level].set_decoding_layers(
+                        self.inter_inputers[level],
+                        self.inter_reseters[level],
+                        self.inter_updaters[level])
+
+    def _create_initialization_layers(self):
+        logger.debug("_create_initialization_layers")
+        # zero layer is just a dummy layer that outputs zero of the input size
+        self.initializers = [ZeroLayer()] * self.num_levels
+        if self.state['bias_code']:
+            for level in range(self.num_levels):
+                self.initializers[level] = MultiLayer(
+                    self.rng,
+                    n_in=self.state['c_dim'],
+                    n_hids=[self.state['dim'],
+                    activation=[prefix_lookup(self.state, 'inter', 'activ')],
+                    bias_scale=[self.state['bias']],
+                    name='{}_initializer_{}'.format(self.prefix, level),
+                    **self.default_kwargs)
+
+    def _create_decoding_layers(self):
+        """
+        This layer is called on c, which is the state provided by the encoder
+
+        Kelvin 
+        """
+        logger.debug("_create_intermediate_layers")
+        self.inter_inputers = [lambda x : 0] * self.num_levels
+        self.inter_reseters = [lambda x : 0] * self.num_levels
+        self.inter_updaters = [lambda x : 0] * self.num_levels
+        inter_kwargs = dict(self.default_kwargs)
+        inter_kwargs.update(dict(
+                n_in=self.state['c_dim'],
+                n_hids=self.state['dim'],
+                activation=['lambda x:x'],
+                learn_bias=False))
+
+        for level in range(self.num_levels):
+            # Input contributions
+            self.inter_inputers[level] = MultiLayer(
+                self.rng,
+                name='{}_inter_inputter_{}'.format(self.prefix, level),
+                **inter_kwargs)
+            # Update gate contributions
+            if prefix_lookup(self.state, 'inter', 'rec_gating'):
+                self.inter_updaters[level] = MultiLayer(
+                    self.rng,
+                    name='{}_inter_updater_{}'.format(self.prefix, level),
+                    **inter_kwargs)
+            # Reset gate contributions
+            if prefix_lookup(self.state, 'inter', 'rec_reseting'):
+                self.inter_reseters[level] = MultiLayer(
+                    self.rng,
+                    name='{}_inter_reseter_{}'.format(self.prefix, level),
+                    **inter_kwargs)
+
+    def build_intermediate(self, c, 
+            c_mask=None, 
+            y=None, 
+            y_mask=None,
+            step_num=None,
+            mode=EVALUATION,
+            given_init_states=None,
+            T=1):
+        """
+        Build function for intermediate search layer 
+        """
+        # Check parameter consistency
+        if mode == Intermediate.EVALUATION:
+            assert not given_init_states
+        else:
+            assert not y_mask
+            assert given_init_states
+            if mode == Intermediate.BEAM_SEARCH:
+                assert T == 1
+
+        input_signals = []
+        reset_signals = []
+        update_signals = []
+       
+        init_states = given_init_states
+        if not init_states:
+            init_states = []
+            for level in range(self.num_levels):
+                init_c = c[0, :, -self.state['dim']:]
+                init_states.append(self.initializers[level](init_c))
+
+        # Hidden layers' states.
+        # Shapes if mode == evaluation:
+        #  (seq_len, batch_size, dim)
+        # Shapes if mode != evaluation:
+        #  (n_samples, dim)
+        hidden_layers = []
+        contexts = []
+        # Default value for alignment must be smth computable
+        alignment = TT.zeros((1,))
+        for level in range(self.num_levels):
+           # pass in init_states through kwargs for fprop
+            add_kwargs = dict(state_before=init_states[level])
+
+            add_kwargs['c'] = c
+            # c_mask and x_mask should be the same
+            add_kwargs['c_mask'] = c_mask
+            add_kwargs['return_alignment'] = self.compute_alignment
+            if mode != Decoder.EVALUATION:
+                add_kwargs['step_num'] = c.shape[0] # I think this is right... 
+
+            # context is added through in add_kwargs, the recurrence
+            # relation is defined inside the call. 
+            result = self.transitions[level](
+                    input_signals[level],
+                    # TODO do I need this? 
+                    mask=None,
+                    gater_below=none_if_zero(update_signals[level]),
+                    reseter_below=none_if_zero(reset_signals[level]),
+                    one_step=mode != Decoder.EVALUATION,
+                    use_noise=mode == Decoder.EVALUATION,
+                    **add_kwargs)
+
+            if self.compute_alignment:
+                # This implicitly wraps each element of result.out with a
+                # Layer to keep track of the parameters.
+                # It is equivalent to h=result[0], ctx=result[1] etc. 
+                # h -> is s in the paper. 
+                h, ctx, alignment = result
+                if mode == Decoder.EVALUATION:
+                    alignment = alignment.out
+            else:
+                # This implicitly wraps each element of result.out with a 
+                # Layer to keep track of the parameters.
+                #It is equivalent to h=result[0], ctx=result[1]
+                h, ctx = result
+            hidden_layers.append(h)
+            contexts.append(ctx)
+        # assuming here that h is the tensor containing hidden state.  
+        return h

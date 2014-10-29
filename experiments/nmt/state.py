@@ -9,6 +9,9 @@
     it will have all the state settings in prototype_phrase_state and 
     whatever was added or overwritten in prototype_encdec_state_*
 
+    There are a lot of extra prototypes here, as it serves as record of
+    experiments
+
 """
 
 def prototype_phrase_state():
@@ -110,6 +113,12 @@ def prototype_phrase_state():
     state['dec_rec_reseting'] = True
     state['dec_rec_gater'] = 'lambda x: TT.nnet.sigmoid(x)'
     state['dec_rec_reseter'] = 'lambda x: TT.nnet.sigmoid(x)'
+     # Hidder layer configuration for the intermediate
+    state['inter_rec_layer'] = None
+    state['inter_rec_gating'] = None
+    state['inter_rec_reseting'] = None
+    state['inter_rec_gater'] = None
+    state['inter_rec_reseter'] = 'None
     # Default hidden layer configuration, which is effectively used for
     # the backward RNN
     # TODO: separate back_enc_ configuration and convert the old states
@@ -662,27 +671,30 @@ def prototype_search_state_zh_en_multi_attention():
     """
     state = prototype_encdec_state_zh_en()
 
+    # second attention mechanism 
+    state['inter_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['inter_rec_gating'] = True
+    state['inter_rec_reseting'] = True
+    state['inter_rec_gater'] = 'lambda x: TT.nnet.sigmoid(x)'
+    state['inter_rec_reseter'] = 'lambda x: TT.nnet.sigmoid(x)'
+
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
     state['last_forward'] = False
     state['forward'] = True
     state['backward'] = True
 
-    # testing multi attention mechanism
-    # it appears that'd it be way better to just modify the encoder part of the code
-    state['decoder_stack'] = 1
-
     state['dim'] = 1000
     # embedding dimensionality
     state['rank_n_approx'] = 600
     
     # bleu validation args
-    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
-    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
-    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
-    state['validation_set_out'] = '/data/lisatmp3/xukelvin/multi-attention/val_out.txt'
-    state['beam_size'] = 1
-    state['bleu_val_frequency'] = 4000
+    #state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    #state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    #state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    #state['validation_set_out'] = '/data/lisatmp3/xukelvin/multi-attention/val_out.txt'
+    #state['beam_size'] = 1
+    #state['bleu_val_frequency'] = 4000
 
     state['prefix'] = '/data/lisatmp3/xukelvin/multi-attention/test_'
 
