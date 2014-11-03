@@ -463,6 +463,8 @@ class Layer(Container):
                 return self.fprop(*args, **kwargs)
         new_obj = utils.copy(self)
 
+        # if calculations are passed in as layers, we extract the
+        # tensors to simplify the code in fprop/eval/train etc  
         args = [new_obj.tensor_from_layer(arg) for arg in args]
         kwargs = dict([(k, new_obj.tensor_from_layer(v)) for k,v in kwargs.items()])
         if 'do' in kwargs:

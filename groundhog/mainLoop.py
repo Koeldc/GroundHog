@@ -338,7 +338,7 @@ class MainLoop(object):
                         self.patience = self.state['patience']
                         for p in self.model.params:
                             p.set_value(bparams[p.name])
-
+ 
                 if self.state['hookFreq'] > 0 and \
                    self.step % self.state['hookFreq'] == 0 and \
                    self.hooks:

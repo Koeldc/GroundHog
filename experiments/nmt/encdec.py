@@ -298,8 +298,8 @@ class RecurrentLayerWithSearch(Layer):
             self.params_grad_scale += layer.params_grad_scale
 
     def step_fprop(self,
-                   state_below,
-                   state_before,
+                   state_below=None,
+                   state_before=None,
                    gater_below=None,
                    reseter_below=None,
                    mask=None,
@@ -319,10 +319,6 @@ class RecurrentLayerWithSearch(Layer):
         :type mask: None or theano variable
         :param mask: mask describing the length of each sequence in a
             minibatch
-
-        :type state_before: theano variable
-        :param state_before: the previous value of the hidden state of the
-            layer
 
         :type updater_below: theano variable
         :param updater_below: the input to the update gate
@@ -393,7 +389,10 @@ class RecurrentLayerWithSearch(Layer):
         # Probabilities are broadcasted at the 2nd dimension.
         ctx = (c * probs.dimshuffle(0, 1, 'x')).sum(axis=0)
 
-        state_below += self.c_inputer(ctx).out
+        if state_below is None:
+            state_below = self.c_inputer(ctx).out 
+        else:
+            state_below += self.c_inputer(ctx).out
         reseter_below += self.c_reseter(ctx).out
         updater_below += self.c_updater(ctx).out
 
@@ -424,7 +423,7 @@ class RecurrentLayerWithSearch(Layer):
         return results
 
     def fprop(self,
-              state_below,
+              state_below=None,
               mask=None,
               init_state=None,
               gater_below=None,
@@ -450,7 +449,7 @@ class RecurrentLayerWithSearch(Layer):
                 nstphrase_stateeps = nsteps / batch_size
         if batch_size is None and state_below.ndim == 3:
             batch_size = state_below.shape[1]
-        if state_below.ndim == 2 and \
+        if state_below and state_below.ndim == 2 and \
            (not isinstance(batch_size,int) or batch_size > 1):
             state_below = state_below.reshape((nsteps, batch_size, self.n_in))
             if updater_below:
@@ -468,12 +467,35 @@ class RecurrentLayerWithSearch(Layer):
 
         p_from_c =  utils.dot(c, self.A_cp).reshape(
                 (c.shape[0], c.shape[1], self.n_hids))
-        
+
+        """
+        if state_below is None:
+            if mask:
+                sequences = [state_below, mask, updater_below, reseter_below]
+                non_sequences = [c, c_mask, p_from_c] 
+                #              seqs    | out |  non_seqs
+                fn = lambda x, m, g, r,   h,   c1, cm, pc : self.step_fprop(x, h, mask=m,
+                        gater_below=g, reseter_below=r,
+                        c=c1, p_from_c=pc, c_mask=cm,
+                        use_noise=use_noise, no_noise_bias=no_noise_bias,
+                        return_alignment=return_alignment)
+            else:
+                sequences = [state_below, updater_below, reseter_below]
+                non_sequences = [c, p_from_c]
+                #            seqs   | out | non_seqs
+                fn = lambda x, g, r,   h,    c1, pc : self.step_fprop(x, h,
+                        gater_below=g, reseter_below=r,
+                        c=c1, p_from_c=pc,
+                        use_noise=use_noise, no_noise_bias=no_noise_bias,
+                        return_alignment=return_alignment)
+        else:
+        """
+ 
         if mask:
             sequences = [state_below, mask, updater_below, reseter_below]
             non_sequences = [c, c_mask, p_from_c] 
             #              seqs    | out |  non_seqs
-            fn = lambda x, m, g, r,   h,   c1, cm, pc : self.step_fprop(x, h, mask=m,
+            fn = lambda x, m, g, r,   h,   c1, cm, pc : self.step_fprop(state_below=x, state_before=h, mask=m,
                     gater_below=g, reseter_below=r,
                     c=c1, p_from_c=pc, c_mask=cm,
                     use_noise=use_noise, no_noise_bias=no_noise_bias,
@@ -482,7 +504,7 @@ class RecurrentLayerWithSearch(Layer):
             sequences = [state_below, updater_below, reseter_below]
             non_sequences = [c, p_from_c]
             #            seqs   | out | non_seqs
-            fn = lambda x, g, r,   h,    c1, pc : self.step_fprop(x, h,
+            fn = lambda x, g, r,   h,    c1, pc : self.step_fprop(state_below=x, state_before=h,
                     gater_below=g, reseter_below=r,
                     c=c1, p_from_c=pc,
                     use_noise=use_noise, no_noise_bias=no_noise_bias,
@@ -894,7 +916,7 @@ class Decoder(EncoderDecoderBase):
         """
         This layer is called on c, which is the state provided by the encoder
         """
-        logger.debug("_create_intermediate_decoding_layers")
+        logger.debug("_create_decoding_layers")
         self.decode_inputers = [lambda x : 0] * self.num_levels
         self.decode_reseters = [lambda x : 0] * self.num_levels
         self.decode_updaters = [lambda x : 0] * self.num_levels
@@ -1078,7 +1100,7 @@ class Decoder(EncoderDecoderBase):
         update_signals = []
         for level in range(self.num_levels):
             # Contributions directly from input words.
-            input_signals.append(self.input_embedders[level](approx_embeddings)) # E * \tilde(s)_i
+            input_signals.append(self.input_embedders[level](approx_embeddings)) # \tilde(s)_i
             update_signals.append(self.update_embedders[level](approx_embeddings)) # z_i
             reset_signals.append(self.reset_embedders[level](approx_embeddings)) # r_i
 
@@ -1119,6 +1141,7 @@ class Decoder(EncoderDecoderBase):
                 update_signals[level] += self.updaters[level](hidden_layers[level - 1])
                 reset_signals[level] += self.reseters[level](hidden_layers[level - 1])
             # pass in init_states through kwargs for fprop
+            import ipdb; ipdb.set_trace()
             add_kwargs = (dict(state_before=init_states[level])
                         if mode != Decoder.EVALUATION
                         else dict(init_state=init_states[level],
@@ -1133,8 +1156,9 @@ class Decoder(EncoderDecoderBase):
                     add_kwargs['step_num'] = step_num
             # context is added through in add_kwargs, the recurrence
             # relation is defined inside the call. 
+                
             result = self.transitions[level](
-                    input_signals[level],
+                    state_below=input_signals[level],
                     mask=y_mask,
                     gater_below=none_if_zero(update_signals[level]),
                     reseter_below=none_if_zero(reset_signals[level]),
@@ -1405,11 +1429,11 @@ class RNNEncoderDecoder(object):
         # since c since the concatenation of two encoders
         self.state['c_dim'] = len(training_c_components) * self.state['dim']
 
-        self.intermediate = Intermediate(self.state, self.rng, compute_alignment=True)
-        intermediate = self.intermediate.build_intermediate(c=Concatenate(axis=2)(*training_c_components),
-                                                            c_mask=self.x_mask) 
+        #self.intermediate = Intermediate(self.state, self.rng, compute_alignment=True)
+        #self.intermediate.create_layers()
+        #intermediate = self.intermediate.build_intermediate(c=Concatenate(axis=2)(*training_c_components),
+        #                                                    c_mask=self.x_mask) 
                                                             
-        import ipdb; ipdb.set_trace()
 
         # Decoder creation section 
         logger.debug("Create decoder")
@@ -1647,16 +1671,15 @@ class Intermediate(EncoderDecoderBase):
         logger.debug("_create_initialization_layers")
         # zero layer is just a dummy layer that outputs zero of the input size
         self.initializers = [ZeroLayer()] * self.num_levels
-        if self.state['bias_code']:
-            for level in range(self.num_levels):
-                self.initializers[level] = MultiLayer(
-                    self.rng,
-                    n_in=self.state['c_dim'],
-                    n_hids=[self.state['dim'],
-                    activation=[prefix_lookup(self.state, 'inter', 'activ')],
-                    bias_scale=[self.state['bias']],
-                    name='{}_initializer_{}'.format(self.prefix, level),
-                    **self.default_kwargs)
+        for level in range(self.num_levels):
+            self.initializers[level] = MultiLayer(
+                self.rng,
+                n_in=self.state['c_dim'],
+                n_hids=self.state['dim'],
+                activation=[prefix_lookup(self.state, 'inter', 'activ')],
+                bias_scale=[self.state['bias']],
+                name='{}_initializer_{}'.format(self.prefix, level),
+                **self.default_kwargs)
 
     def _create_decoding_layers(self):
         """
@@ -1696,8 +1719,6 @@ class Intermediate(EncoderDecoderBase):
 
     def build_intermediate(self, c, 
             c_mask=None, 
-            y=None, 
-            y_mask=None,
             step_num=None,
             mode=EVALUATION,
             given_init_states=None,
@@ -1705,6 +1726,8 @@ class Intermediate(EncoderDecoderBase):
         """
         Build function for intermediate search layer 
         """
+        import ipdb; ipdb.set_trace()
+
         # Check parameter consistency
         if mode == Intermediate.EVALUATION:
             assert not given_init_states
@@ -1734,43 +1757,51 @@ class Intermediate(EncoderDecoderBase):
         contexts = []
         # Default value for alignment must be smth computable
         alignment = TT.zeros((1,))
-        for level in range(self.num_levels):
-           # pass in init_states through kwargs for fprop
-            add_kwargs = dict(state_before=init_states[level])
+       
+        # pass in init_states through kwargs for fprop
+        add_kwargs = (dict(state_before=init_states[level])
+                    if mode != Decoder.EVALUATION
+                    else dict(init_state=init_states[level],
+                        #TODO what is the right value for this? 
+                        batch_size=y.shape[1] if y.ndim == 2 else 1,
+                        nsteps=y.shape[0]))
 
-            add_kwargs['c'] = c
-            # c_mask and x_mask should be the same
-            add_kwargs['c_mask'] = c_mask
-            add_kwargs['return_alignment'] = self.compute_alignment
-            if mode != Decoder.EVALUATION:
-                add_kwargs['step_num'] = c.shape[0] # I think this is right... 
+        add_kwargs['c'] = c
+        # c_mask and x_mask should be the same
+        add_kwargs['c_mask'] = c_mask
+        add_kwargs['return_alignment'] = self.compute_alignment
+        if mode != Decoder.EVALUATION:
+            add_kwargs['step_num'] = c.shape[0] # I think this is right... 
 
-            # context is added through in add_kwargs, the recurrence
-            # relation is defined inside the call. 
-            result = self.transitions[level](
-                    input_signals[level],
-                    # TODO do I need this? 
-                    mask=None,
-                    gater_below=none_if_zero(update_signals[level]),
-                    reseter_below=none_if_zero(reset_signals[level]),
-                    one_step=mode != Decoder.EVALUATION,
-                    use_noise=mode == Decoder.EVALUATION,
-                    **add_kwargs)
+        # context is added through in add_kwargs, the recurrence
+        # relation is defined inside the call. 
+        # TODO: the RecurrentLayerWithSearch does not allow None in state below
+        # for fprop.. need to fix that. 
+        result = self.transitions[0](
+                state_below=None,
+                # TODO do I need this? 
+                mask=None,
+                gater_below=None,
+                reseter_below=None,
+                one_step=mode != Decoder.EVALUATION,
+                use_noise=mode == Decoder.EVALUATION,
+                **add_kwargs)
 
-            if self.compute_alignment:
-                # This implicitly wraps each element of result.out with a
-                # Layer to keep track of the parameters.
-                # It is equivalent to h=result[0], ctx=result[1] etc. 
-                # h -> is s in the paper. 
-                h, ctx, alignment = result
-                if mode == Decoder.EVALUATION:
-                    alignment = alignment.out
-            else:
-                # This implicitly wraps each element of result.out with a 
-                # Layer to keep track of the parameters.
-                #It is equivalent to h=result[0], ctx=result[1]
-                h, ctx = result
-            hidden_layers.append(h)
-            contexts.append(ctx)
+        if self.compute_alignment:
+            # This implicitly wraps each element of result.out with a
+            # Layer to keep track of the parameters.
+            # It is equivalent to h=result[0], ctx=result[1] etc. 
+            # h -> is s in the paper. 
+            h, ctx, alignment = result
+            if mode == Decoder.EVALUATION:
+                alignment = alignment.out
+        else:
+            # This implicitly wraps each element of result.out with a 
+            # Layer to keep track of the parameters.
+            #It is equivalent to h=result[0], ctx=result[1]
+            h, ctx = result
+        hidden_layers.append(h)
+        contexts.append(ctx)
+
         # assuming here that h is the tensor containing hidden state.  
         return h

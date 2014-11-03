@@ -118,7 +118,7 @@ def prototype_phrase_state():
     state['inter_rec_gating'] = None
     state['inter_rec_reseting'] = None
     state['inter_rec_gater'] = None
-    state['inter_rec_reseter'] = 'None
+    state['inter_rec_reseter'] = None
     # Default hidden layer configuration, which is effectively used for
     # the backward RNN
     # TODO: separate back_enc_ configuration and convert the old states
@@ -684,9 +684,9 @@ def prototype_search_state_zh_en_multi_attention():
     state['forward'] = True
     state['backward'] = True
 
-    state['dim'] = 1000
+    state['dim'] = 200
     # embedding dimensionality
-    state['rank_n_approx'] = 600
+    state['rank_n_approx'] = 200
     
     # bleu validation args
     #state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'

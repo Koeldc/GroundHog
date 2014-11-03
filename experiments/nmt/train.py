@@ -264,7 +264,7 @@ def main():
             reset=state['reset'],
             bleu_val_fn = bleu_validator, 
             hooks=[RandomSamplePrinter(state, lm_model, train_data)]
-                if state['hookFreq'] >= 0 and state['validation_set'] is not None
+                if state['hookFreq'] >= 0 
                 else None)
 
     if state['reload']:
