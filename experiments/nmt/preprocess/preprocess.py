@@ -106,10 +106,6 @@ def safe_hdf(array, name):
                                 array.shape, filters=filters)
             ds[:] = array
 
-def process_utf8(line):
-    return [c for c in line.strip().decode('utf8', "replace")
-                            if (c not in string.ascii_letters) and c != ' ']
-
 def create_dictionary():
     # Part I: Counting the words
     counters = []
