@@ -146,6 +146,8 @@ def prototype_phrase_state():
     state['beam_size'] = None
     # Number of steps between every validation
     state['bleu_val_frequency'] = None
+    # Number of steps before starting validation
+    state['burn_in'] = 0 # default no burn in 
 
 
     # ----- WEIGHTS, INITIALIZATION -----
@@ -291,9 +293,6 @@ def prototype_search_state_zh_en_3000_600():
     """
     This prototype is for zh-> with a large hidden state 
     
-    This was used once but it was determined that a smaller
-    model overfit a lot 
-
     Testing with validation set 
     """
     state = prototype_encdec_state_zh_en()
@@ -314,11 +313,14 @@ def prototype_search_state_zh_en_3000_600():
     state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
     state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
     state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
-    #state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_small_val.txt'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/bleu_valid_large/encdec_50_zh_en_3000_600.txt'
     state['beam_size'] = 10
+    state['burn_in'] = 10000
     state['bleu_val_frequency'] = 5000
 
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/huge/encdec_50_zh_en_3000_600_'
+    state['bs']  = 80
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/bleu_valid_large/encdec_50_zh_en_3000_600_'
     return state
 
 def prototype_search_state_zh_en_small():
@@ -357,7 +359,7 @@ def prototype_search_state_zh_en_small():
 
 def prototype_search_state_zh_en():
     """
-    This prototype is for zh -> english 
+    This is the working prototype of the zh-> en 
     """
     state = prototype_encdec_state_zh_en()
 
@@ -371,20 +373,25 @@ def prototype_search_state_zh_en():
     state['forward'] = True
     state['backward'] = True
 
-    state['dim'] = 1000
+    state['dim'] = 1200
     # embedding dimensionality
     state['rank_n_approx'] = 600
 
     # validation set for early stopping
     # bleu validation args
     state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
-    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
     state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
-    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_val.txt'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/bleu_valid/encdec_50_big_cv.txt'
+    state['output_validation_set'] = True
     state['beam_size'] = 20
-    state['bleu_val_frequency'] = 4000
+    state['bleu_val_frequency'] = 4500
 
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/encdec_30_zh_en_'
+    state['seqlen'] = 50
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/zh-en/tedmodels/bleu_valid/encdec_50_big_control_'
+
+    return state
 
 # en -> zh
 
@@ -525,7 +532,7 @@ def prototype_search_state_zh_huge():
 
 def prototype_search_state_zh_big_control():
     """
-    This model tries to acertain if training with 30 -> 50 is good or bad. 
+    Current prototype
     """
     state = prototype_encdec_state_zh()
 
@@ -542,9 +549,10 @@ def prototype_search_state_zh_big_control():
     # validation set for early stopping
     # bleu validation args
     state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
-    state['validation_set_grndtruth'] = '/data/lisatmp3/xukelvin/translation/validation_sets/clean_IWSLT13.TED.dev2010.en-zh.zh'
-    state['validation_set'] = '/data/lisatmp3/xukelvin/translation/validation_sets/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
     state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/bleu_valid/encdec_50_big_cv.txt'
+    #state['output_validation_set'] = True
     state['beam_size'] = 30
     state['bleu_val_frequency'] = 4500
 

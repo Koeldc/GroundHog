@@ -344,7 +344,8 @@ class MainLoop(object):
                    self.hooks:
                     [fn() for fn in self.hooks]
                 
-                if self.state['bleu_val_frequency'] is not None and \
+                if self.step > self.state['burn_in'] and \
+                    self.state['bleu_val_frequency'] is not None and \
                     self.step % self.state['bleu_val_frequency'] == 0 \
                     and self.bleu_val_fn is not None and self.step > 0:
                     if self.bleu_val_fn():
