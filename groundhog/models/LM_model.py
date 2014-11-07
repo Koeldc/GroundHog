@@ -14,6 +14,7 @@ __contact__ = "Razvan Pascanu <r.pascanu@gmail>"
 import numpy
 import itertools
 import logging
+import gc
 
 import cPickle as pkl
 
@@ -170,49 +171,68 @@ class LM_Model(Model):
 
 
     def validate(self, data_iterator, train=False):
+        """
+        Re-implementation of cross entropy based on
+        Jan's SR model. 
+
+        The gc collection statements can apparently 
+        be removed if we theano to do garbage collection 
+        """
+        data_iterator.reset()
+
+        if self.valid_step is None:
+            logger.debug('Compiling validation function') 
+            if self.valid_tot_batch_cost is None:
+                tot_batch_cost = self.cost_layer.cost_per_sample.sum()
+                if hasattr(self.rnnencdec, 'clean_trans_x'):
+                    #Dropout - replace trans_x with clean_trans_x
+                    trans_x = self.rnnencdec.trans_x
+                    if hasattr(trans_x, 'out'):
+                        trans_x = trans_x.out
+                    clean_trans_x = self.rnnencdec.clean_trans_x
+                    if hasattr(clean_trans_x, 'out'):
+                        clean_trans_x = clean_trans_x.out
+                        
+                    tot_batch_cost = theano.clone(tot_batch_cost, 
+                                                  replace={trans_x: clean_trans_x}, 
+                                                  share_inputs=True)
+                self.valid_tot_batch_cost = tot_batch_cost
+ 
+            self.valid_step = theano.function(inputs=self.inputs, 
+                                              outputs=self.valid_tot_batch_cost, 
+                                              no_default_updates=True
+                                              )
+        gc.collect()
+        gc.collect()
+        gc.collect()
+ 
         cost = 0
-        n_batches = 0
-        n_steps = 0
-        if self.del_noise and self.clean_noise_validation:
-            if self.need_inputs_for_generating_noise:
-                self.del_noise(**vals)
-            else:
-                self.del_noise()
-
+        n_expls = 0
+        n_words = 0
+                
         for vals in data_iterator:
-            n_batches += 1
-
-            if isinstance(vals, dict):
-                val = vals.values()[0]
-                if val.ndim ==3:
-                    n_steps += val.shape[0]*val.shape[1]
+            assert isinstance(vals, dict)
+            if self.del_noise and self.clean_noise_validation:
+                if self.need_inputs_for_generating_noise:
+                    self.del_noise(**vals)
                 else:
-                    n_steps += val.shape[0]
+                    self.del_noise()
 
-                _rvals = self.validate_step( **vals)
-                cost += _rvals
-            else:
-                # not dict
-                if vals[0].ndim ==3:
-                    n_steps += vals[0].shape[0]*vals[1].shape[1]
-                else:
-                    n_steps += vals[0].shape[0]
-                if self.del_noise and self.clean_noise_validation:
-                    if self.need_inputs_for_generating_noise:
-                        self.del_noise(*vals)
-                    else:
-                        self.del_noise()
-                inps = list(vals)
-                _rvals = self.validate_step(*inps)
-                _cost += _rvals
+            y_mask = vals['y_mask']
+            n_expls += y_mask.shape[1]
+            n_words += y_mask.sum()
+            cost += self.valid_step( **vals)
+        
+        #ugly hack to prevent out-of memory errors
+        self.valid_step = None
+        
+        gc.collect()
+        gc.collect()
+        gc.collect()
 
-        n_steps = numpy.log(2.)*n_steps
-        cost = cost / n_steps
-
-        entropy = cost# (numpy.log(2.))
-        ppl = 10**(numpy.log(2)*cost/numpy.log(10))
-        return [('cost',entropy), ('ppl',ppl)]
-
+        return [('log_p_expl', cost / n_expls ),
+                ('log_p_word', cost / n_words )
+                ] 
 
     def load_dict(self, opts):
         """

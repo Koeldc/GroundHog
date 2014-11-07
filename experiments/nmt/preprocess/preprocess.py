@@ -32,6 +32,9 @@ parser.add_argument("input", type=argparse.FileType('r'), nargs="+",
                     help="The input files")
 parser.add_argument("-b", "--binarized-text", default='binarized_text.pkl',
                     help="the name of the pickled binarized text file")
+parser.add_argument("-k", "--validation_set", default='binarized_val_text.pkl',
+                    help="the name of external validation set, to create a "
+                    "validation set strictly from the input see -s")
 parser.add_argument("-d", "--dictionary", default='vocab.pkl',
                     help="the name of the pickled binarized text file")
 parser.add_argument("-n", "--ngram", type=int, metavar="N",
@@ -58,9 +61,9 @@ parser.add_argument("-t", "--char", action="store_true",
                     help="character-level processing")
 
 
-def open_files():
+def open_files(files=args.input):
     base_filenames = []
-    for i, input_file in enumerate(args.input):
+    for i, input_file in enumerate(files):
         dirname, filename = os.path.split(input_file.name)
         if filename.split(os.extsep)[-1] == 'gz':
             base_filename = filename.rstrip('.gz')
@@ -173,7 +176,7 @@ def create_dictionary():
     return combined_counter, sentence_counts, counters, vocab
 
 
-def binarize():
+def binarize(filenames=base_filenames):
     if args.ngram:
         assert numpy.iinfo(numpy.uint16).max > len(vocab)
         ngrams = numpy.empty((sum(combined_counter.values()) +
@@ -182,7 +185,7 @@ def binarize():
     binarized_corpora = []
     total_ngram_count = 0
     for input_file, base_filename, sentence_count in \
-            zip(args.input, base_filenames, sentence_counts):
+            zip(args.input, filenames, sentence_counts):
         input_filename = os.path.basename(input_file.name)
         logger.info("Binarizing %s." % (input_filename))
         binarized_corpus = []
@@ -261,4 +264,7 @@ if __name__ == "__main__":
     base_filenames = open_files()
     combined_counter, sentence_counts, counters, vocab = create_dictionary()
     if args.ngram or args.pickle:
-        binarize()
+        binarize(base_filenames)
+    if args.validation_set:
+        val_file = open_files(args.validation_set)
+        binarize(val_file)
