@@ -163,11 +163,15 @@ class MainLoop(object):
         self.batch_start_time = time.time()
 
     def validate(self):
+        # the language model or speech model or machine translation model
+        # must have this attribute 
         rvals = self.model.validate(self.valid_data)
         msg = '**  %d     validation:' % self.valid_id
+        print_mem('validate')
         self.valid_id += 1
         self.batch_start_time = time.time()
         pos = self.step // self.state['validFreq']
+        # saves the return of the 
         for k, v in rvals:
             msg = msg + ' ' + k + ':%f ' % float(v)
             self.timings['valid'+k][pos] = float(v)

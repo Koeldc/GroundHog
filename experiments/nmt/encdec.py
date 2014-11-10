@@ -130,7 +130,7 @@ def create_padded_batch(state, x, y, return_dict=False):
     else:
         return X, Xmask, Y, Ymask
 
-def get_batch_iterator(state):
+def get_batch_iterator(state, which_set='train'):
 
     class Iterator(PytablesBitextIterator):
 
@@ -175,16 +175,25 @@ def get_batch_iterator(state):
                 self.peeked_batch = batch
             return batch
 
-    train_data = Iterator(
+    if which_set == 'train':
+        data_source = 0
+    elif which_set == 'val':
+        data_source = 1
+    elif which_set == 'test':
+        data_source = 2
+    else:
+        raise NameError('Unknown dataset')
+
+    data = Iterator(
         batch_size=int(state['bs']),
-        target_file=state['target'][0],
-        source_file=state['source'][0],
+        target_file=state['target'][data_source],
+        source_file=state['source'][data_source],
         can_fit=False,
         queue_size=1000,
         shuffle=state['shuffle'],
         use_infinite_loop=state['use_infinite_loop'],
         max_len=state['seqlen'])
-    return train_data
+    return data
 
 class RecurrentLayerWithSearch(Layer):
     """A copy of RecurrentLayer from groundhog"""

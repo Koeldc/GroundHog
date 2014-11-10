@@ -175,8 +175,12 @@ class LM_Model(Model):
         Re-implementation of cross entropy based on
         Jan's SR model. 
 
+        It seems this doesn't work for dropout...
+
         The gc collection statements can apparently 
         be removed if we theano to do garbage collection 
+
+        Kelvin Xu
         """
         data_iterator.reset()
 
@@ -184,18 +188,20 @@ class LM_Model(Model):
             logger.debug('Compiling validation function') 
             if self.valid_tot_batch_cost is None:
                 tot_batch_cost = self.cost_layer.cost_per_sample.sum()
-                if hasattr(self.rnnencdec, 'clean_trans_x'):
-                    #Dropout - replace trans_x with clean_trans_x
-                    trans_x = self.rnnencdec.trans_x
-                    if hasattr(trans_x, 'out'):
-                        trans_x = trans_x.out
-                    clean_trans_x = self.rnnencdec.clean_trans_x
-                    if hasattr(clean_trans_x, 'out'):
-                        clean_trans_x = clean_trans_x.out
-                        
-                    tot_batch_cost = theano.clone(tot_batch_cost, 
-                                                  replace={trans_x: clean_trans_x}, 
-                                                  share_inputs=True)
+                # this for loop has to the with dropout which I'm not sure is needed
+                #if hasattr(self.rnnencdec, 'clean_trans_x'):
+                #    # What is trans_x
+                #    # Dropout - replace trans_x with clean_trans_x
+                #    trans_x = self.rnnencdec.trans_x
+                #    if hasattr(trans_x, 'out'):
+                #        trans_x = trans_x.out
+                #    clean_trans_x = self.rnnencdec.clean_trans_x
+                #    if hasattr(clean_trans_x, 'out'):
+                #        clean_trans_x = clean_trans_x.out
+                #        
+                #    tot_batch_cost = theano.clone(tot_batch_cost, 
+                #                                  replace={trans_x: clean_trans_x}, 
+                #                                  share_inputs=True)
                 self.valid_tot_batch_cost = tot_batch_cost
  
             self.valid_step = theano.function(inputs=self.inputs, 
@@ -229,6 +235,8 @@ class LM_Model(Model):
         gc.collect()
         gc.collect()
         gc.collect()
+
+        # note the difference between the two
 
         return [('log_p_expl', cost / n_expls ),
                 ('log_p_word', cost / n_words )
