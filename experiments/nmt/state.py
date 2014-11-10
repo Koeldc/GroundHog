@@ -715,4 +715,3 @@ def prototype_search_state_zh_en_test():
     state['prefix'] = '/data/lisatmp3/xukelvin/tmp/test_'
     return state
 
-
