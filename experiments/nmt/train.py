@@ -253,14 +253,19 @@ def main():
         beam_search.compile()
         bleu_validator = BleuValidator(state, lm_model, beam_search, verbose=state['output_validation_set']) 
 
-    logger.debug("Load data")
-    train_data = get_batch_iterator(state)
+    logger.debug("Loading Training data")
+    train_data = get_batch_iterator(state, which_set='train')
+    val_data = None
+    if len(state['target']) > 1: 
+        logger.debug("Loading Validation data")
+        val_data = get_batch_iterator(state, which_set='val')
+
     logger.debug("Compile trainer")
 
     algo = eval(state['algo'])(lm_model, state, train_data)
     logger.debug("Run training")
     
-    main = MainLoop(train_data, None, None, lm_model, algo, state, None,
+    main = MainLoop(train_data, val_data, None, lm_model, algo, state, None,
             reset=state['reset'],
             bleu_val_fn = bleu_validator, 
             hooks=[RandomSamplePrinter(state, lm_model, train_data)]

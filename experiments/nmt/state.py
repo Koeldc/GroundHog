@@ -261,8 +261,8 @@ def prototype_encdec_state_zh_en():
     state = prototype_phrase_state()
      
     # Source and target sentence
-    state['source'] = ["/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5"]
-    state['target'] = ["/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5"]
+    state['source'] = ["/data/lisatmp3/xukelvin/translation/en_zh_datasets/ted/originals/processed/binarized_text.zh.shuf.h5"]
+    state['target'] = ["/data/lisatmp3/xukelvin/translation/en_zh_datasets/ted/originals/processed/binarized_text.en.shuf.h5"]
     # Word -> Id and Id-> Word Dictionaries
     state['indx_word_target'] = "/data/lisatmp3/xukelvin/translation/en-zh/ted/ivocab.en.pkl"
     state['indx_word'] = "/data/lisatmp3/xukelvin/translation/en-zh/ted/ivocab.zh.pkl"
@@ -330,8 +330,9 @@ def prototype_search_state_zh_en_small():
     state = prototype_encdec_state_zh_en()
 
     #location of validation set
-    state['source'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5")
-    state['target'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5")
+
+    #state['source'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5")
+    #state['target'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5")
 
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
@@ -362,8 +363,8 @@ def prototype_search_state_zh_en():
     state = prototype_encdec_state_zh_en()
 
     #location of validation set
-    state['source'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5")
-    state['target'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5")
+    #state['source'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.zh.shuf.h5")
+    #state['target'].append("/data/lisatmp3/xukelvin/translation/en-zh/ted/binarized_text.en.shuf.h5")
 
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
@@ -694,6 +695,9 @@ def prototype_search_state_zh_en_test():
     """
     state = prototype_encdec_state_zh_en()
 
+    state['target'].append("/data/lisatmp3/xukelvin/translation/en_zh_datasets/ted/originals/processed/binarized_text.val.zh.shuf.h5")
+    state['source'].append("/data/lisatmp3/xukelvin/translation/en_zh_datasets/ted/originals/processed/binarized_text.val.en.shuf.h5")
+
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
     state['last_forward'] = False
@@ -710,8 +714,9 @@ def prototype_search_state_zh_en_test():
     state['validation_set'] = '/data/lisatmp3/chokyun/ted/en-zh/clean_IWSLT13.TED.dev2010.en-zh.zh'
     state['validation_set_out'] = '/data/lisatmp3/xukelvin/tmp/val_out.txt'
     state['beam_size'] = 1
-    state['bleu_val_frequency'] = 1
+    state['bleu_val_frequency'] = 1000
 
     state['prefix'] = '/data/lisatmp3/xukelvin/tmp/test_'
+    state['validFreq'] = 10
     return state
 

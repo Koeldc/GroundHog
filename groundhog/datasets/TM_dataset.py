@@ -255,8 +255,11 @@ class PytablesBitextIterator(object):
         return self
 
     def next(self):
+        if self.exit_flag:
+            return None
         batch = self.queue.get()
-        if not batch:
+        if not batch[0]:
+            self.exit_flag = True
             return None
         self.next_offset = batch[0]
         return batch[1], batch[2]

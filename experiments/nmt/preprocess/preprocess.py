@@ -32,9 +32,6 @@ parser.add_argument("input", type=argparse.FileType('r'), nargs="+",
                     help="The input files")
 parser.add_argument("-b", "--binarized-text", default='binarized_text.pkl',
                     help="the name of the pickled binarized text file")
-parser.add_argument("-k", "--validation_set", default=False,
-                    help="the name of external validation set, to create a "
-                    "validation set strictly from the input see -s")
 parser.add_argument("-d", "--dictionary", default='vocab.pkl',
                     help="the name of the pickled binarized text file")
 parser.add_argument("-n", "--ngram", type=int, metavar="N",
@@ -59,7 +56,6 @@ parser.add_argument("-c", "--count", action="store_true",
                     help="save the word counts")
 parser.add_argument("-t", "--char", action="store_true",
                     help="character-level processing")
-
 
 def open_files(input_files):
     base_filenames = []
@@ -175,6 +171,23 @@ def create_dictionary():
     safe_pickle(vocab, args.dictionary)
     return combined_counter, sentence_counts, counters, vocab
 
+def binarize_external(validation_set, vocab_location, output_name, split_type):
+    """
+    Helper function
+    """    
+
+    input_file = open(validation_set,'r')
+    vocab = cPickle.load(open(vocab_location, 'r'))
+    binarized_corpus = []
+    for sentence in input_file:
+        if split_type == 'char':
+            words = list(sentence.strip().decode('utf-8'))
+        else:
+            words = sentence.strip().split(' ')
+        binarized_sentence = [vocab.get(word, 1) for word in words]
+        binarized_corpus.append(binarized_sentence)
+
+    safe_pickle(binarized_corpus, output_name)
 
 def binarize():
     if args.ngram:
@@ -256,13 +269,13 @@ def binarize():
     elif args.ngram:
         safe_hdf(ngrams, 'combined')
 
+#globals
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('preprocess')
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('preprocess')
     args = parser.parse_args()
     base_filenames = open_files(args.input)
     combined_counter, sentence_counts, counters, vocab = create_dictionary()
     if args.ngram or args.pickle:
         binarize()
-    print args.validation_set 

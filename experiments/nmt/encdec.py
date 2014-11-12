@@ -143,7 +143,16 @@ def get_batch_iterator(state, which_set='train'):
             while True:
                 k_batches = state['sort_k_batches']
                 batch_size = state['bs']
-                data = [PytablesBitextIterator.next(self) for k in range(k_batches)]
+                data = []
+                for k in xrange(k_batches):
+                    bb = PytablesBitextIterator.next(self) 
+                    if bb == None:
+                        break
+                    data.append(bb)
+                if len(data) < 1:
+                    yield None
+
+                # data = [PytablesBitextIterator.next(self) for k in range(k_batches)]
                 x = numpy.asarray(list(itertools.chain(*map(operator.itemgetter(0), data))))
                 y = numpy.asarray(list(itertools.chain(*map(operator.itemgetter(1), data))))
                 lens = numpy.asarray([map(len, x), map(len, y)])
@@ -151,6 +160,8 @@ def get_batch_iterator(state, which_set='train'):
                         else numpy.arange(len(x))
                 for k in range(k_batches):
                     indices = order[k * batch_size:(k + 1) * batch_size]
+                    if len(indices) < 1:
+                        yield None
                     batch = create_padded_batch(state, [x[indices]], [y[indices]],
                             return_dict=True)
                     if batch:
@@ -176,23 +187,34 @@ def get_batch_iterator(state, which_set='train'):
             return batch
 
     if which_set == 'train':
-        data_source = 0
+        data = Iterator(
+            batch_size=int(state['bs']),
+            target_file=state['target'][0],
+            source_file=state['source'][0],
+            can_fit=False,
+            queue_size=1000,
+            shuffle=state['shuffle'],
+            use_infinite_loop=state['use_infinite_loop'] ,
+            max_len=state['seqlen'],
+            )
     elif which_set == 'val':
         data_source = 1
+        data = Iterator(
+            batch_size=int(state['bs']),
+            target_file=state['target'][1],
+            source_file=state['source'][1],
+            can_fit=True,
+            queue_size=1000,
+            shuffle=state['shuffle'],
+            use_infinite_loop=False,
+            max_len=state['seqlen'],
+            ) 
     elif which_set == 'test':
         data_source = 2
+        raise NotImplemented()
     else:
         raise NameError('Unknown dataset')
 
-    data = Iterator(
-        batch_size=int(state['bs']),
-        target_file=state['target'][data_source],
-        source_file=state['source'][data_source],
-        can_fit=False,
-        queue_size=1000,
-        shuffle=state['shuffle'],
-        use_infinite_loop=state['use_infinite_loop'],
-        max_len=state['seqlen'])
     return data
 
 class RecurrentLayerWithSearch(Layer):

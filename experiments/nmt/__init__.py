@@ -3,6 +3,7 @@ from encdec import get_batch_iterator
 from encdec import parse_input
 from encdec import create_padded_batch
 
+from debug import print_variables
 
 from state import\
     prototype_phrase_state,\

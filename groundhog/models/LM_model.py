@@ -134,6 +134,8 @@ class LM_Model(Model):
             for x,p in zip(self.param_grads, self.params) if p not in
                 self.exclude_params_for_norm))
         # another place to add stuff that gets saved into timing.npz
+        # TODO, test the difference between train_cost and cost_per_sample.mean()
+        # note the cost_per_sample does not use scale
         new_properties = [
                 ('grad_norm', grad_norm),
                 ('log2_p_word', self.train_cost / num_words / scale),
@@ -182,11 +184,14 @@ class LM_Model(Model):
 
         Kelvin Xu
         """
-        data_iterator.reset()
 
-        if self.valid_step is None:
+        import ipdb; ipdb.set_trace()
+
+        data_iterator.start(-1)
+        
+        if self.validate_step is None:
             logger.debug('Compiling validation function') 
-            if self.valid_tot_batch_cost is None:
+            if not hasattr(self, 'valid_tot_batch_cost'):
                 tot_batch_cost = self.cost_layer.cost_per_sample.sum()
                 # this for loop has to the with dropout which I'm not sure is needed
                 #if hasattr(self.rnnencdec, 'clean_trans_x'):
@@ -204,7 +209,7 @@ class LM_Model(Model):
                 #                                  share_inputs=True)
                 self.valid_tot_batch_cost = tot_batch_cost
  
-            self.valid_step = theano.function(inputs=self.inputs, 
+            self.validate_step = theano.function(inputs=self.inputs, 
                                               outputs=self.valid_tot_batch_cost, 
                                               no_default_updates=True
                                               )
@@ -227,19 +232,19 @@ class LM_Model(Model):
             y_mask = vals['y_mask']
             n_expls += y_mask.shape[1]
             n_words += y_mask.sum()
-            cost += self.valid_step( **vals)
+            cost += self.validate_step( **vals)
         
         #ugly hack to prevent out-of memory errors
-        self.valid_step = None
+        self.validate_step = None
         
         gc.collect()
         gc.collect()
         gc.collect()
 
-        # note the difference between the two
+        scale = numpy.float32(numpy.log(2))
 
-        return [('log_p_expl', cost / n_expls ),
-                ('log_p_word', cost / n_words )
+        return [('log2_p_expl', cost / n_expls / scale ),
+                ('log2_p_word', cost / n_words / scale )
                 ] 
 
     def load_dict(self, opts):
