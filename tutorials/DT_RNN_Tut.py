@@ -1,7 +1,7 @@
 """
 Test of the classical LM model for language modelling
 """
-from groundhog.datasets import LMIterator
+from groundhog.datasets import unilingual_data
 from groundhog.trainer.SGD_momentum import SGD as SGD_m
 from groundhog.trainer.SGD import SGD
 from groundhog.mainLoop import MainLoop
@@ -44,45 +44,8 @@ def get_text_data(state):
     def out_format_valid (x, y, r):
         return {'x':x, 'y' :y, 'reset': r}
 
-    train_data = LMIterator(
-            batch_size=state['bs'],
-            path = state['path'],
-            stop=-1,
-            seq_len = state['seqlen'],
-            mode="train",
-            chunks=state['chunks'],
-            shift = state['shift'],
-            output_format = out_format,
-            can_fit=True)
+    train_data, valid_data, test_data = unilingual_data.load_data(path, batch_size = state['bs'], n_words = 30000):
 
-    valid_data = LMIterator(
-            batch_size=state['bs'],
-            path=state['path'],
-            stop=-1,
-            use_infinite_loop=False,
-            allow_short_sequences = True,
-            seq_len= state['seqlen'],
-            mode="valid",
-            reset =state['reset'],
-            chunks=state['chunks'],
-            shift = state['shift'],
-            output_format = out_format_valid,
-            can_fit=True)
-
-    test_data = LMIterator(
-            batch_size=state['bs'],
-            path = state['path'],
-            stop=-1,
-            use_infinite_loop=False,
-            allow_short_sequences=True,
-            seq_len= state['seqlen'],
-            mode="test",
-            chunks=state['chunks'],
-            shift = state['shift'],
-            output_format = out_format_valid,
-            can_fit=True)
-    if 'wiki' in state['path']:
-        test_data = None
     return train_data, valid_data, test_data
 
 def jobman(state, channel):

@@ -10,6 +10,7 @@ import time
 
 import ipdb
 
+from groundhog.trainer.SGD_nesterov import SGD as SGD_nesterov
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
 from groundhog.trainer.SGD import SGD as SGD
 from groundhog.trainer.SGD_momentum import SGD as SGD_momentum
@@ -264,7 +265,7 @@ def main():
             reset=state['reset'],
             bleu_val_fn = bleu_validator, 
             hooks=[RandomSamplePrinter(state, lm_model, train_data)]
-                if state['hookFreq'] >= 0 and state['validation_set'] is not None
+                if state['hookFreq'] >= 0
                 else None)
 
     if state['reload']:

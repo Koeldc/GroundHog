@@ -240,7 +240,7 @@ def prototype_phrase_state():
     # Frequency of training error reports (in number of batches)
     state['trainFreq'] = 1
     # Frequency of running hooks
-    state['hookFreq'] = 13
+    state['hookFreq'] = 20
     # Validation frequency
     state['validFreq'] = 500
     # Model saving frequency (in minutes)
@@ -610,7 +610,46 @@ def prototype_search_state_zh_big_cv():
 
 
     state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/encdec_30_big_cv_'
+
     return state
+
+def prototype_search_state_zh_big_cv_rmsprop():
+    """
+    This prototype integrates the search model into the translation with a larger size
+    
+    This model uses cross validation
+    """
+    state = prototype_encdec_state_zh()
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+
+    state['dim'] = 1500
+    # embedding dimensionality
+    state['rank_n_approx'] = 800
+
+    # rmpsprop stuff
+    state['algo'] = 'SGD_nesterov'
+    state['moment'] = .95
+    state['lr'] = 0.5
+
+    # validation set for early stopping
+    # bleu validation args
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/xukelvin/translation/validation_sets/clean_IWSLT13.TED.dev2010.en-zh.zh'
+    state['validation_set'] = '/data/lisatmp3/xukelvin/translation/validation_sets/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/rmsprop/encdec_30_big_cv.txt'
+    state['beam_size'] = 30
+    state['bleu_val_frequency'] = 5000
+    state['burn_in'] = 14999
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/rmsprop/encdec_30_big_cv_'
+
+    return state
+
 
 
 # original configs
@@ -661,7 +700,7 @@ def prototype_search_state():
     state['backward'] = True
     state['seqlen'] = 50
     state['sort_k_batches'] = 20
-    state['prefix'] = 'search_'
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/dima_reproduce/en_fr_search_'
     return state
 
 def prototype_search_state_zh_en_multi_attention():

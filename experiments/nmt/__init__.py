@@ -19,6 +19,7 @@ from state import\
     prototype_search_state_zh_big,\
     prototype_search_state_zh_big_control,\
     prototype_search_state_zh_big_cv,\
+    prototype_search_state_zh_big_cv_rmsprop,\
     prototype_search_state_zh_huge,\
     prototype_search_state_zh_big_openmt15,\
     prototype_search_state_zh_en_big_openmt15
