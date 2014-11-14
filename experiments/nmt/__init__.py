@@ -3,7 +3,6 @@ from encdec import get_batch_iterator
 from encdec import parse_input
 from encdec import create_padded_batch
 
-
 from state import\
     prototype_phrase_state,\
     prototype_encdec_state,\
@@ -22,6 +21,9 @@ from state import\
     prototype_search_state_zh_huge,\
     prototype_search_state_zh_big_openmt15,\
     prototype_search_state_zh_en_big_openmt15
+
+from state_lm import\
+    prototype_lm_state
 
 from sample import \
     sample, BeamSearch

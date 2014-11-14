@@ -1192,7 +1192,7 @@ class Decoder(EncoderDecoderBase):
                 read_from = read_from_var
             readout += self.hidden_readouts[level](read_from)
         if self.state['bigram']:
-            # what is going on here (Kelvin Xu)
+            # what is going on here.. 
             if mode != Decoder.EVALUATION:
                 check_first_word = (y > 0
                     if self.state['check_first_word']
