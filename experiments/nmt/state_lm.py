@@ -1,7 +1,7 @@
 def prototype_lm_state():
 
     state = {}
-    # Random seed 
+
     state['seed'] = 1234
     state['level'] = 'DEBUG'
 
@@ -55,7 +55,7 @@ def prototype_lm_state():
 
     state['rank_n_activ'] = 'lambda x: x'
 
-    state['rec_layer'] = 'RecurrentMultiLayerShortPathInpAll'
+    state['rec_layer'] = 'RecurrentLayer'
     state['rec_gating'] = True
     state['rec_reseting'] = True
     state['rec_gater'] = 'lambda x: TT.nnet.sigmoid(x)'
@@ -76,6 +76,9 @@ def prototype_lm_state():
 
     # ------ TRAINING METHOD ----
 
+    # Bleu validation
+    state['bleu_val_frequency'] = None
+
     # Turns on noise contrastive estimation instead maximum likelihood
     state['use_nce'] = False
 
@@ -85,6 +88,7 @@ def prototype_lm_state():
     # Early Stopping Stuff
     state['patience'] = 1
     state['lr'] = 1.
+    state['minlr'] = 0
 
     # this should be always true
     state['carry_h0'] = True
@@ -114,7 +118,8 @@ def prototype_lm_state():
     # Frequency of training error reports (in number of batches)
     state['trainFreq'] = 10
     # Frequency of running hooks
-    state['hookFreq'] = 13
+    # right now this doesn't work 
+    state['hookFreq'] = -1 
     # Validation frequency
     state['validFreq'] = 500
     # Model saving frequency (in minutes)

@@ -4,16 +4,15 @@ import pprint
 import operator
 import itertools
 
-import ipdb
-
 import theano
 import theano.tensor as TT
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from groundhog.datasets import PytablesBitextIterator_UL
-from experiments.nmt import prototype_lm_state
-
+from groundhog.models import LM_Model
+from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
 from groundhog.mainLoop import MainLoop
+from experiments.nmt import prototype_lm_state
 
 from groundhog.layers import\
         Layer,\
@@ -33,6 +32,12 @@ from groundhog.layers import\
         LastState,\
         DropOp,\
         Concatenate
+
+
+def none_if_zero(x):
+    if x == 0:
+        return None
+    return x
 
 def create_padded_batch(state, x, y, return_dict=False):
     """A callback given to the iterator to transform data in suitable format
@@ -77,6 +82,8 @@ def create_padded_batch(state, x, y, return_dict=False):
     # Fill X and Xmask
     for idx in xrange(len(x[0])):
         # Insert sequence idx in a column of matrix X
+        # if mx is longer than the length of the sequence
+        # it wil just the whole sequence ergo :len(x[0][idx])
         if mx < len(x[0][idx]):
             X[:mx, idx] = x[0][idx][:mx]
         else:
@@ -89,6 +96,7 @@ def create_padded_batch(state, x, y, return_dict=False):
         # Initialize Xmask column with ones in all positions that
         # were just set in X
         Xmask[:len(x[0][idx]), idx] = 1.
+        # Similarly mark the end of phrase
         if len(x[0][idx]) < mx:
             Xmask[len(x[0][idx]), idx] = 1.
 
@@ -135,7 +143,23 @@ def create_padded_batch(state, x, y, return_dict=False):
         return X, Xmask, Y, Ymask
 
 def get_batch_iterator(state):
+    """
+    get_batch_iterator returns an iterator that respects
+    the standard python iterator protocol, it has options to
+    allow for infinite looping for a training set, or finite
+    looping for a validation set
 
+    The Iterator class defined inheriets from a PytablesBitextIterator
+    or some variant, which manages the PytablesBitextFetcher class
+    which iterfaces with the HDF5 file, using another thread to
+    reduce computations spent shuttling from the disc
+
+    The Iterator object at one time only loads in k_batches into memory,
+    then proprocesses the batch by adding masks to the data before 
+    returning. 
+
+    Kelvin Xu
+    """
     class Iterator(PytablesBitextIterator_UL):
 
         def __init__(self, *args, **kwargs):
@@ -197,6 +221,11 @@ class LM_builder(object):
         self.rng = rng
         self.skip_init = True if self.state['reload'] else False
 
+        self.default_kwargs = dict(
+            init_fn=self.state['weight_init_fn'] if not self.skip_init else "sample_zeros",
+            weight_noise=self.state['weight_noise'],
+            scale=self.state['weight_scale'])
+
         self.__create_layers__()
 
     def __create_layers__(self):
@@ -206,12 +235,10 @@ class LM_builder(object):
             n_in=self.state['n_sym'],
             n_hids=self.state['rank_n_approx'],
             activation=eval(self.state['rank_n_activ']),
-            init_fn=state['weight_init_fn'] if not self.skip_init else "sample_zeros",
-            weight_noise=self.state['weight_noise'],
-            scale=self.state['weight_scale'],
             learn_bias = True,
             bias_scale=self.state['bias'],
-            name='lm_emb_words')
+            name='lm_emb_words',
+            **self.default_kwargs)
 
         self.rec = eval(self.state['rec_layer'])(
                 rng,
@@ -223,11 +250,30 @@ class LM_builder(object):
                     if not self.skip_init
                     else "sample_zeros",
                 weight_noise=self.state['weight_noise_rec'],
-                #gating=self.state['rec_gating'],
-                #gater_activation=self.state['rec_gater'],
-                #reseting=self.state['rec_reseting'],
-                #reseter_activation=self.state['rec_reseter'],
+                gating=self.state['rec_gating'],
+                gater_activation=self.state['rec_gater'],
+                reseting=self.state['rec_reseting'],
+                reseter_activation=self.state['rec_reseter'],
                  name='lm_rec')
+
+        gate_kwargs = dict(self.default_kwargs)
+        gate_kwargs.update(dict(
+            n_in=self.state['rank_n_approx'],
+            n_hids=[self.state['dim']],
+            activation=['lambda x:x']))
+
+        self.inputer = MultiLayer(
+                self.rng,
+                name='inputer',
+                **gate_kwargs) 
+        self.reseter = MultiLayer(
+                self.rng,
+                name='reseter',
+                **gate_kwargs)
+        self.updater = MultiLayer(
+                self.rng,
+                name='updater',
+                **gate_kwargs)
 
         self.output_layer = SoftmaxLayer(
             rng,
@@ -265,31 +311,37 @@ class LM_builder(object):
         self.y = TT.lmatrix('y')
         self.y_mask = TT.matrix('y_mask')
 
+        n_samples = self.x.shape[1]
+
         self.inputs = [self.x, self.y, self.x_mask, self.y_mask]
 
+        # the demensions of this is (time*batch_id, embedding dim)
+        # the whole input is flattened to support advanced indexing < -- should read this.  
         self.x_emb = self.emb_words(self.x, no_noise_bias=self.state['no_noise_bias'])
 
-        self.h0 = theano.shared(numpy.zeros(self.state['dim'], dtype='float32'))
+        #self.h0 = theano.shared(numpy.zeros(self.state['dim'], dtype='float32'))
+        #self.reset = TT.scalar('reset')
 
-        self.reset = TT.scalar('reset')
+        x_input = self.inputer(self.x_emb) 
+        update_signals = self.updater(self.x_emb)
+        reset_signals = self.reseter(self.x_emb) 
 
-        self.rec_layer = self.rec(self.x_emb, self.x_mask, 
-                    init_state=self.h0*self.reset,
+        self.rec_layer = self.rec(x_input, mask=self.x_mask, 
+                    # init_state=self.h0*self.reset, this seems unneccessary
                     no_noise_bias=self.state['no_noise_bias'],
-                    truncate_gradient=self.state['cutoff'],
-                    batch_size=self.x_emb.shape[1],
-                    #nsteps=self.x_emb.shape[0]
-                    )
- 
-        self.train_model = self.output_layer(self.rec_layer,
-        no_noise_bias=self.state['no_noise_bias']).train(target=self.y,
+                    #truncate_gradient=self.state['cutoff'],
+                    batch_size=n_samples,
+                    gater_below=none_if_zero(update_signals),
+                    reseter_below=none_if_zero(reset_signals),
+                     )
+
+        self.train_model = self.output_layer(self.rec_layer).train(target=self.y,
                 mask=self.y_mask)
 
         # TODO should double check this..
-        self.nw_h0 = self.rec_layer.out[self.rec_layer.out.shape[0]-1]
-
-        if state['carry_h0']:
-            train_model.updates += [(self.h0, self.nw_h0)]
+        #self.nw_h0 = self.rec_layer.out[self.rec_layer.out.shape[0]-1]
+        #if state['carry_h0']:
+        #    train_model.updates += [(self.h0, self.nw_h0)]
 
 if __name__ == '__main__':
     state = prototype_lm_state()
@@ -298,11 +350,11 @@ if __name__ == '__main__':
 
     train_data = get_batch_iterator(state) 
     train_data.start()
-    text= train_data.next()
     model = LM_builder(state, rng)
     model.build()
 
-    import ipdb; ipdb.set_trace()
+    #TODO
+    valid_fn = None
 
     lm_model = LM_Model(
         cost_layer = model.train_model,
@@ -315,10 +367,12 @@ if __name__ == '__main__':
     algo = eval(state['algo'])(lm_model, state, train_data)
 
     main = MainLoop(train_data, None, None, lm_model, algo, state, None,
-            reset=state['reset'],
-            hooks=[RandomSamplePrinter(state, lm_model, train_data)]
-                if state['hookFreq'] >= 0 
-                else None)
+            reset=state['reset']
+            )
+            # TODO add printer hook 
+            #hooks=[RandomSamplePrinter(state, lm_model, train_data)]
+            #    if state['hookFreq'] >= 0 
+            #    else None)
 
     if state['reload']:
         main.load()

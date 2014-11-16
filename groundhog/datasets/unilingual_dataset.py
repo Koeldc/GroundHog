@@ -112,7 +112,7 @@ class PytablesBitextFetcher(threading.Thread):
                    """ 
 
             if len(target_ngrams):
-                diter.queue.put([target_ngrams])
+                diter.queue.put([int(offset),target_ngrams])
             if last_batch:
                 diter.queue.put([None])
                 return
@@ -158,7 +158,8 @@ class PytablesBitextIterator_UL(object):
         batch = self.queue.get()
         if not batch:
             return None
-        barray = numpy.array(batch[0])
+        self.next_offset = batch[0]
+        barray = numpy.array(batch[1])
         X = [x[:-1].astype(self.dtype) for x in barray]
         Y = [y[1:].astype(self.dtype) for y in barray]
         assert len(X[0]) == len(Y[0])

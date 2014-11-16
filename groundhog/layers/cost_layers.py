@@ -1097,6 +1097,11 @@ class SoftmaxLayer(CostLayer):
         target_ndim = target.ndim
         target_shape = target.shape
 
+        if state_below.ndim == 3:
+            state_below_shp = state_below.shape
+            state_below = state_below.reshape([state_below.shape[0]*state_below.shape[1], state_below.shape[2]])
+
+
         if self.use_nce:
             logger.debug("Using NCE")
 
