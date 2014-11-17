@@ -604,7 +604,7 @@ def prototype_search_state_zh_big_cv():
     state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/multi-bleu.perl'
     state['validation_set_grndtruth'] = '/data/lisatmp3/xukelvin/translation/validation_sets/clean_IWSLT13.TED.dev2010.en-zh.zh'
     state['validation_set'] = '/data/lisatmp3/xukelvin/translation/validation_sets/clean_IWSLT13.TED.dev2010.en-zh.tok.en'
-    state['validation_set_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/bleu_valid/encdec_30_big_cv_.txt'
+    state['validation_se`t_out'] = '/data/lisatmp3/xukelvin/translation/en-zh/tedmodels/bleu_valid/encdec_30_big_cv_.txt'
     state['beam_size'] = 30
     state['bleu_val_frequency'] = 4500
 

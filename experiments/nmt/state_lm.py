@@ -11,6 +11,7 @@ def prototype_lm_state():
 
     # TODO H5 the dataset and shuffle it
     state['target'] = '/data/lisatmp3/xukelvin/translation/fr/binarized_lm_text.fr.shuf.h5'
+
     state['indx_word'] = '/data/lisatmp3/xukelvin/translation/fr/ivocab.fr.pkl'
     state['word_indx'] = 'data/lisatmp3/xukelvin/translation/fr/vocab.fr.pkl'
 
@@ -26,7 +27,7 @@ def prototype_lm_state():
 
     state['sort_k_batches'] = 20
 
-    state['bs'] = 10
+    state['bs'] = 100
 
     state['use_infinite_loop'] = True
     state['seqlen'] = 50
@@ -40,7 +41,7 @@ def prototype_lm_state():
     # TODO 
     # from jointly learning to align paper
     state['rank_n_approx'] = 620
-    state['dim'] = 400
+    state['dim'] = 1000
 
     # weight noise settings 
     state['weight_init_fn'] = 'sample_weights_classic'
@@ -118,15 +119,15 @@ def prototype_lm_state():
     # Frequency of training error reports (in number of batches)
     state['trainFreq'] = 10
     # Frequency of running hooks
-    # right now this doesn't work 
-    state['hookFreq'] = -1 
+    state['sampling_seed'] = 5
+    state['hookFreq'] = 1000 
     # Validation frequency
     state['validFreq'] = 500
     # Model saving frequency (in minutes)
     state['saveFreq'] = 10
 
     # Sampling hook settings
-    state['n_samples'] = 3
+    state['sample_steps'] = 10
     state['n_examples'] = 3
 
     # Raise exception if nan

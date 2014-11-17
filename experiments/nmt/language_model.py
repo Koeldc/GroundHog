@@ -4,8 +4,12 @@ import pprint
 import operator
 import itertools
 
+import cPickle
+
 import theano
 import theano.tensor as TT
+from theano import scan
+from theano.sandbox.scan import scan as scan_sandbox
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from groundhog.datasets import PytablesBitextIterator_UL
@@ -327,9 +331,7 @@ class LM_builder(object):
         reset_signals = self.reseter(self.x_emb) 
 
         self.rec_layer = self.rec(x_input, mask=self.x_mask, 
-                    # init_state=self.h0*self.reset, this seems unneccessary
                     no_noise_bias=self.state['no_noise_bias'],
-                    #truncate_gradient=self.state['cutoff'],
                     batch_size=n_samples,
                     gater_below=none_if_zero(update_signals),
                     reseter_below=none_if_zero(reset_signals),
@@ -343,6 +345,44 @@ class LM_builder(object):
         #if state['carry_h0']:
         #    train_model.updates += [(self.h0, self.nw_h0)]
 
+    def get_sampler(self):
+        """
+        Sampling         
+        """
+        def sample_fn(word_tm1, h_tm1):
+            x_emb = self.emb_words(word_tm1, use_noise = False, one_step=True)  
+            x_input = self.inputer(x_emb)
+            update_signal = self.updater(x_emb)
+            reset_signal = self.reseter(x_emb)
+            h0 = self.rec(x_input, gater_below=update_signal,
+                          reseter_below=reset_signal,
+                          state_before=h_tm1, 
+                          one_step=True, use_noise=False)
+            word = self.output_layer.get_sample(state_below=h0)
+            return word, h0
+
+        # oddly non-functional scan code 
+        #[samples, summaries], updates = scan(sample_fn,
+        #                    outputs_info=[TT.alloc(numpy.int64(5),1), 
+        #                    TT.alloc(numpy.float32(0), 1,state['dim'])
+        #                    ],
+        #                    n_steps= state['sample_steps'],
+        #                    name='sampler_scan')
+
+        ##### scan for iterating the single-step sampling multiple times
+        [samples, summaries], updates = scan_sandbox(sample_fn,
+                          states = [
+                              TT.alloc(numpy.int64(state['sampling_seed']), state['sample_steps']),
+                              TT.alloc(numpy.float32(0), 1, state['dim'])],
+                          n_steps= state['sample_steps'],
+                          name='sampler_scan')
+
+        ##### define a Theano function
+        sample_fn = theano.function([], [samples], 
+                updates=updates, profile=False, name='sample_fn')
+
+        return sample_fn
+ 
 if __name__ == '__main__':
     state = prototype_lm_state()
 
@@ -360,19 +400,29 @@ if __name__ == '__main__':
         cost_layer = model.train_model,
         weight_noise_amount=state['weight_noise_amount'],
         valid_fn = valid_fn,
+        indx_word=state['indx_word'],
+        indx_word_src=state['indx_word'],
         clean_before_noise_fn = False,
         noise_fn = None,
         rng = rng)
  
     algo = eval(state['algo'])(lm_model, state, train_data)
 
+    sampler = model.get_sampler()
+    def hook_fn():
+        idict = cPickle.load(open(state['indx_word'], 'r'))
+        idict[state['unk_sym']]='<unk>'
+        idict[state['null_sym']]='<eos>'
+        sample = sampler()[0]
+        # prepend the seed
+        sample = numpy.insert(sample, 0, state['sampling_seed'])
+        print " ".join([idict[si] for si in sample])
+
     main = MainLoop(train_data, None, None, lm_model, algo, state, None,
-            reset=state['reset']
-            )
-            # TODO add printer hook 
-            #hooks=[RandomSamplePrinter(state, lm_model, train_data)]
-            #    if state['hookFreq'] >= 0 
-            #    else None)
+            reset=state['reset'],
+            hooks= hook_fn
+                if state['hookFreq'] >= 0 
+                else None)
 
     if state['reload']:
         main.load()
