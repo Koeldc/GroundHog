@@ -321,11 +321,8 @@ class LM_builder(object):
 
         # the demensions of this is (time*batch_id, embedding dim)
         # the whole input is flattened to support advanced indexing < -- should read this.  
+
         self.x_emb = self.emb_words(self.x, no_noise_bias=self.state['no_noise_bias'])
-
-        #self.h0 = theano.shared(numpy.zeros(self.state['dim'], dtype='float32'))
-        #self.reset = TT.scalar('reset')
-
         x_input = self.inputer(self.x_emb) 
         update_signals = self.updater(self.x_emb)
         reset_signals = self.reseter(self.x_emb) 
@@ -339,11 +336,6 @@ class LM_builder(object):
 
         self.train_model = self.output_layer(self.rec_layer).train(target=self.y,
                 mask=self.y_mask)
-
-        # TODO should double check this..
-        #self.nw_h0 = self.rec_layer.out[self.rec_layer.out.shape[0]-1]
-        #if state['carry_h0']:
-        #    train_model.updates += [(self.h0, self.nw_h0)]
 
     def get_sampler(self):
         """

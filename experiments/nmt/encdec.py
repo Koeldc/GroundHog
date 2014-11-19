@@ -1097,6 +1097,8 @@ class Decoder(EncoderDecoderBase):
         if not init_states:
             init_states = []
             for level in range(self.num_levels):
+                # remember that c has the forward and backward 
+                # rnn so we are taking just the backward part here. 
                 init_c = c[0, :, -self.state['dim']:]
                 init_states.append(self.initializers[level](init_c))
 
