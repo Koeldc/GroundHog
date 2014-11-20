@@ -219,6 +219,10 @@ def get_batch_iterator(state):
     return data
 
 class LM_builder(object):
+    """
+    Object that encapsulates the languages model
+
+    """
 
     def __init__(self, state, rng):
         self.state = state
@@ -306,7 +310,7 @@ class LM_builder(object):
             name='lm_shortcut')
         """
 
-    def build(self):
+    def build(self, build_output=True):
         """
         Build Computational Graph
         """
@@ -321,8 +325,8 @@ class LM_builder(object):
 
         # the demensions of this is (time*batch_id, embedding dim)
         # the whole input is flattened to support advanced indexing < -- should read this.  
-
         self.x_emb = self.emb_words(self.x, no_noise_bias=self.state['no_noise_bias'])
+
         x_input = self.inputer(self.x_emb) 
         update_signals = self.updater(self.x_emb)
         reset_signals = self.reseter(self.x_emb) 
@@ -333,14 +337,18 @@ class LM_builder(object):
                     gater_below=none_if_zero(update_signals),
                     reseter_below=none_if_zero(reset_signals),
                      )
+        # if we are building this graph for translation, we need not build the output 
+        if build_output == True: 
+            self.train_model = self.output_layer(self.rec_layer).train(target=self.y,
+                    mask=self.y_mask)
 
-        self.train_model = self.output_layer(self.rec_layer).train(target=self.y,
-                mask=self.y_mask)
-
-    def get_sampler(self):
+    def get_sampler(self, build_output=True):
         """
         Sampling         
         """
+    
+        # TODO change sampler so only return h0
+        
         def sample_fn(word_tm1, h_tm1):
             x_emb = self.emb_words(word_tm1, use_noise = False, one_step=True)  
             x_input = self.inputer(x_emb)

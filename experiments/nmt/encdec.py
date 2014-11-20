@@ -955,7 +955,7 @@ class Decoder(EncoderDecoderBase):
                 name='{}_hid_readout_{}'.format(self.prefix, level),
                 **readout_kwargs)
 
-        # connection from previous work to current
+        # connection from previous word to current
         self.prev_word_readout = 0
         if self.state['bigram']:
             self.prev_word_readout = MultiLayer(
@@ -1074,8 +1074,8 @@ class Decoder(EncoderDecoderBase):
         reset_signals = []
         update_signals = []
         for level in range(self.num_levels):
-            # Contributions directly from input words.
-            input_signals.append(self.input_embedders[level](approx_embeddings)) # E * \tilde(s)_i
+            # Contributions directly from target words.
+            input_signals.append(self.input_embedders[level](approx_embeddings)) # E * y_i
             update_signals.append(self.update_embedders[level](approx_embeddings)) # z_i
             reset_signals.append(self.reset_embedders[level](approx_embeddings)) # r_i
 
@@ -1165,6 +1165,8 @@ class Decoder(EncoderDecoderBase):
         # In hidden_layers we do no have the initial state, but we need it.
         # Instead of it we have the last one, which we do not need.
         # So what we do is discard the last one and prepend the initial one.
+
+        # Kelvin Xu, somewhat important detail
         if mode == Decoder.EVALUATION:
             for level in range(self.num_levels):
                 hidden_layers[level].out = TT.concatenate([
@@ -1193,8 +1195,9 @@ class Decoder(EncoderDecoderBase):
             else:
                 read_from = read_from_var
             readout += self.hidden_readouts[level](read_from)
+        # bigram refers to the fact that we are using yi-1
+        # note that shift leaves the last layer with zeros. 
         if self.state['bigram']:
-            # what is going on here.. 
             if mode != Decoder.EVALUATION:
                 check_first_word = (y > 0
                     if self.state['check_first_word']
@@ -1214,6 +1217,7 @@ class Decoder(EncoderDecoderBase):
                     readout += Shift()(self.prev_word_readout(approx_embeddings).reshape(
                         (y.shape[0], y.shape[1], self.state['dim']))).reshape(
                                 readout.out.shape)
+   
         for fun in self.output_nonlinearities:
             readout = fun(readout)
 
