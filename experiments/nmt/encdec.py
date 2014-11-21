@@ -26,7 +26,9 @@ from groundhog.models import LM_Model
 from groundhog.datasets import PytablesBitextIterator
 from groundhog.utils import sample_zeros, sample_weights_orth, init_bias, sample_weights_classic
 import groundhog.utils as utils
-import pdb
+from experiments.nmt import \
+        LM_builder,\
+        prototype_lm_state
 
 logger = logging.getLogger(__name__)
 
@@ -830,6 +832,10 @@ class Decoder(EncoderDecoderBase):
         self.skip_init = skip_init
         self.compute_alignment = compute_alignment
 
+        # should we really keep these separate?
+        if self.state['include_lm']:
+            self.state_lm = prototype_lm_state()
+
         # Actually there is a problem here -
         # we don't make difference between number of input layers
         # and outputs layers.
@@ -860,6 +866,9 @@ class Decoder(EncoderDecoderBase):
         # softmax output
         self._create_readout_layers()
 
+        if self.state['include_lm']:
+            self._create_lm()
+
         # sets the function that will be applied to the context vector
         # in the step_fprop of RecurrentLayerWithSearch
         # when we are in search mode, we have needs for these
@@ -872,6 +881,13 @@ class Decoder(EncoderDecoderBase):
                         self.decode_reseters[level],
                         self.decode_updaters[level])
 
+    def _create_lm(): 
+        logger.debug("Creating language model")
+        self.LM_builder = LM_builder(self.state_lm, self.rng, skip_init=True)
+        # build output refers to the softmax over words 
+        self.LM_builder.__create_layers__(build_output=False)
+        # TODO remove params from grad list
+ 
     def _create_initialization_layers(self):
         logger.debug("_create_initialization_layers")
         # zero layer is just a dummy layer that outputs zero of the input size
@@ -961,6 +977,16 @@ class Decoder(EncoderDecoderBase):
             self.prev_word_readout = MultiLayer(
                 self.rng,
                 n_in=self.state['rank_n_approx'],
+                n_hids=self.state['dim'],
+                activation=['lambda x:x'],
+                learn_bias=False,
+                name='{}_prev_readout_{}'.format(self.prefix, level),
+                **self.default_kwargs)
+
+        if self.state['include_lm']:
+            self.lm_embedder = MultiLayer(
+                self.rng,
+                n_in=self.state_lm['dim'],
                 n_hids=self.state['dim'],
                 activation=['lambda x:x'],
                 learn_bias=False,
@@ -1196,7 +1222,7 @@ class Decoder(EncoderDecoderBase):
                 read_from = read_from_var
             readout += self.hidden_readouts[level](read_from)
         # bigram refers to the fact that we are using yi-1
-        # note that shift leaves the last layer with zeros. 
+        # note that shift fills spaces with 0s 
         if self.state['bigram']:
             if mode != Decoder.EVALUATION:
                 check_first_word = (y > 0
@@ -1218,6 +1244,23 @@ class Decoder(EncoderDecoderBase):
                         (y.shape[0], y.shape[1], self.state['dim']))).reshape(
                                 readout.out.shape)
    
+        # todo, add language model
+        if self.state['include_lm']:
+            lm_hidden_state = self.LM_builder.build_for_translation(y, y_mask, prev_hid)
+            if y.ndim == 1:
+                readout += Shift()(self.lm_embedder(lm_hidden_state).reshape(
+                    (y.shape[0], 1, self.state['dim'])))
+            else:
+                # This place needs explanation. When prev_word_readout is applied to
+                # approx_embeddings the resulting shape is
+                # (n_batches * sequence_length, repr_dimensionality). We first
+                # transform it into 3D tensor to shift forward in time. Then
+                # reshape it back.
+                readout += Shift()(self.lm_embedder(lm_hidden_state).reshape(
+                    (y.shape[0], y.shape[1], self.state['dim']))).reshape(
+                            readout.out.shape)
+
+
         for fun in self.output_nonlinearities:
             readout = fun(readout)
 
@@ -1232,7 +1275,7 @@ class Decoder(EncoderDecoderBase):
                     temp=T,
                     target=sample)
             log_prob = self.output_layer.cost_per_sample
-            return [sample] + [log_prob] + hidden_layers
+            return [sample] + [log_prob] + hidden_layers + [lm_hidden_state]
         elif mode == Decoder.BEAM_SEARCH:
             return self.output_layer(
                     state_below=readout.out,
@@ -1248,6 +1291,7 @@ class Decoder(EncoderDecoderBase):
             raise Exception("Unknown mode for build_decoder")
 
 
+    # TODO fix sampling step 
     def sampling_step(self, *args):
         """Implements one step of sampling
 
@@ -1266,6 +1310,8 @@ class Decoder(EncoderDecoderBase):
         assert next(args).ndim == 1
         prev_hidden_states = [next(args) for k in range(self.num_levels)]
         assert prev_hidden_states[0].ndim == 2
+        #if state['include_lm']:
+        #    last_hid_state = next(args)
 
         # Arguments that correspond to scan's "non_sequences":
         c = next(args)
@@ -1287,6 +1333,9 @@ class Decoder(EncoderDecoderBase):
                 TT.zeros(shape=(n_samples,), dtype='float32')]
         init_c = c[0, -self.state['dim']:]
         states += [ReplicateLayer(n_samples)(init(init_c).out).out for init in self.initializers]
+        # we need to add another list of zeros for the initial state of the hiddens
+        if state['include_lm']:
+            states += [TT.zeros(shape=(n_samples, self.state_lm['dim']), dtype='float32')]
 
         if not self.state['search']:
             c = PadLayer(n_steps)(c).out

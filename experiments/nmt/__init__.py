@@ -1,3 +1,9 @@
+from state_lm import\
+    prototype_lm_state,\
+    prototype_lm_state_en
+
+from language_model import LM_builder
+
 from encdec import RNNEncoderDecoder
 from encdec import get_batch_iterator
 from encdec import parse_input
@@ -21,9 +27,6 @@ from state import\
     prototype_search_state_zh_huge,\
     prototype_search_state_zh_big_openmt15,\
     prototype_search_state_zh_en_big_openmt15
-
-from state_lm import\
-    prototype_lm_state
 
 from sample import \
     sample, BeamSearch

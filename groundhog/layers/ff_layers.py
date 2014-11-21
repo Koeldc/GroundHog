@@ -434,6 +434,8 @@ class Shift(Layer):
     """
     This layer is used to construct the embedding of the encoder by taking
     the last state of the recurrent model
+
+    n is the shift forward (positive), or backwards (negative)
     """
     def __init__(self, n=1, name=None):
         self.n = n

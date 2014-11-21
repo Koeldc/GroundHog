@@ -16,7 +16,8 @@ from groundhog.datasets import PytablesBitextIterator_UL
 from groundhog.models import LM_Model
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
 from groundhog.mainLoop import MainLoop
-from experiments.nmt import prototype_lm_state
+from experiments.nmt import prototype_lm_state,\
+                            prototype_lm_state_en
 
 from groundhog.layers import\
         Layer,\
@@ -221,13 +222,12 @@ def get_batch_iterator(state):
 class LM_builder(object):
     """
     Object that encapsulates the languages model
-
     """
 
-    def __init__(self, state, rng):
+    def __init__(self, state, rng, skip_init=False):
         self.state = state
         self.rng = rng
-        self.skip_init = True if self.state['reload'] else False
+        self.skip_init = skip_init 
 
         self.default_kwargs = dict(
             init_fn=self.state['weight_init_fn'] if not self.skip_init else "sample_zeros",
@@ -236,7 +236,7 @@ class LM_builder(object):
 
         self.__create_layers__()
 
-    def __create_layers__(self):
+    def __create_layers__(self, build_output=True):
         
         self.emb_words = MultiLayer(
             rng,
@@ -282,33 +282,70 @@ class LM_builder(object):
                 self.rng,
                 name='updater',
                 **gate_kwargs)
+        
+        if build_output:
+            self.output_layer = SoftmaxLayer(
+                rng,
+                self.state['dim'],
+                self.state['n_sym'],
+                self.state['out_scale'],
+                self.state['out_sparse'],
+                init_fn="sample_weights_classic",
+                weight_noise=self.state['weight_noise'],
+                sum_over_time=True,
+                name='lm_out')
 
-        self.output_layer = SoftmaxLayer(
-            rng,
-            self.state['dim'],
-            self.state['n_sym'],
-            self.state['out_scale'],
-            self.state['out_sparse'],
-            init_fn="sample_weights_classic",
-            weight_noise=self.state['weight_noise'],
-            sum_over_time=True,
-            name='lm_out')
+    def build_for_translation(self, target, target_mask=None, prev_hid==None):
+        """
+        This function builds the language model for the machine translation
+        system, naturally it requires the target, and target_mask
+        
+        In the sampling step, we have no target_mask
 
         """
-        # this is currently not used
-        self.shortcut = MultiLayer(
-            rng,
-            n_in=self.state['n_in'],
-            n_hids=eval(self.state['inpout_nhids']),
-            activations=eval(self.state['inpout_activ']),
-            init_fn='sample_weights_classic',
-            weight_noise = self.state['weight_noise'],
-            scale=eval(self.state['inpout_scale']),
-            sparsity=eval(self.state['inpout_sparse']),
-            learn_bias=eval(self.state['inpout_learn_bias']),
-            bias_scale=eval(self.state['inpout_bias']),
-            name='lm_shortcut')
+        # this assertion doesn't really make sense
+        assert target.ndim == 3
+
+        n_samples = self.target.shape[1]
+
+        x_emb = self.emb_words(self.target, no_noise_bias=self.state['no_noise_bias'])
+
+        input_signals = self.inputer(x_emb) 
+        update_signals = self.updater(x_emb)
+        reset_signals = self.reseter(x_emb) 
+
+        # if we are doing sampling, we expect a prev_hid state but no target mask,
+
+        self.rec_layer = self.rec(input_signals, mask=target_mask, 
+                    state_before=prev_hid
+                    no_noise_bias=self.state['no_noise_bias'],
+                    batch_size=n_samples,
+                    one_step= True if (prev_hid is not None) and
+                              (target_mask is None) else False,
+                    gater_below=none_if_zero(update_signals),
+                    reseter_below=none_if_zero(reset_signals),
+                     )
+        return self.rec_layer
+
+    def get_const_params(self):
         """
+        This function grabs the params to be excluded from
+        gradient calculation
+        """
+        const_params = []
+        # embedding of language model
+        const_params += self.emb_words.params
+        # Gating units
+        const_params += self.inputer.params
+        const_params += self.updater.params
+        const_params += self.reseter.params
+        # Recurren units
+        const_params += self.rec.params
+        return const_params
+
+    # TODO build sampler for translation
+    def get_sampler_translation(self):
+        pass
 
     def build(self, build_output=True):
         """
@@ -337,12 +374,11 @@ class LM_builder(object):
                     gater_below=none_if_zero(update_signals),
                     reseter_below=none_if_zero(reset_signals),
                      )
-        # if we are building this graph for translation, we need not build the output 
-        if build_output == True: 
-            self.train_model = self.output_layer(self.rec_layer).train(target=self.y,
-                    mask=self.y_mask)
 
-    def get_sampler(self, build_output=True):
+        self.train_model = self.output_layer(self.rec_layer).train(target=self.y,
+                mask=self.y_mask)
+
+    def get_sampler(self):
         """
         Sampling         
         """
@@ -384,13 +420,14 @@ class LM_builder(object):
         return sample_fn
  
 if __name__ == '__main__':
-    state = prototype_lm_state()
+    state = prototype_lm_state_en()
 
     rng = numpy.random.RandomState(state['seed'])
 
     train_data = get_batch_iterator(state) 
     train_data.start()
-    model = LM_builder(state, rng)
+    model = LM_builder(state, rng, skip_init=True 
+                       if state['reload'] else False)
     model.build()
 
     #TODO

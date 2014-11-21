@@ -219,6 +219,10 @@ def prototype_phrase_state():
     # Start from a random entry
     state['shuffle'] = False
 
+    # ----- Say something about loading language models ----
+
+    state['include_lm'] = False
+
     # ----- TRAINING PROCESS -----
 
     # Prefix for the model, state and timing files
@@ -698,7 +702,7 @@ def prototype_search_state_zh_en_multi_attention():
 
 def prototype_search_state_zh_en_test():
     """
-    This prototype is for zh -> english 
+    Test prototype
     """
     state = prototype_encdec_state_zh_en()
 
@@ -724,3 +728,20 @@ def prototype_search_state_zh_en_test():
     return state
 
 
+def prototype_search_state_test_prototype():
+    """This prototype is the configuration used to train the RNNsearch-50 model from the paper
+    'Neural Machine Translation by Jointly Learning to Align and Translate' """
+
+    state = prototype_encdec_state()
+
+    state['include_lm'] = True
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+    state['seqlen'] = 50
+    state['sort_k_batches'] = 20
+    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint/search_'
+    return state

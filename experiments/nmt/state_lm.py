@@ -134,3 +134,18 @@ def prototype_lm_state():
     state['on_nan'] = 'raise'
 
     return state
+
+
+def prototype_lm_state_en():
+    state = prototype_lm_state()
+    state['target'] = '/data/lisatmp3/xukelvin/translation/en_lm/binarized_wiki.en.shuf.h5'
+
+    state['indx_word'] = '/data/lisatmp3/xukelvin/translation/en_lm/ijoint_vocab.pkl'
+    state['word_indx'] = '/data/lisatmp3/xukelvin/translation/en_lm/joint_vocab.pkl'
+
+    # index of 'the' in english 
+    state['sampling_seed'] = 4
+
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/en_lm/lm_'
+
+    return state

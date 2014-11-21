@@ -21,7 +21,7 @@ parser.add_argument("source_output",
                     help="The source output HDF5 file")
 parser.add_argument("-to", "--target_output",
                     type=argparse.FileType('w'),
-                    help="The target output HDF5 file")
+                    help="The target output HDF5 file",
                     default=None)
 args = parser.parse_args()
 
@@ -30,8 +30,7 @@ class Index(tables.IsDescription):
     length = tables.UInt32Col()
 
 # check that either they are both present, or neither are present
-assert (args.target_input == None) == (args.target_output == None)
-       "Missing inputs, please check help" 
+assert ((args.target_input == None) == (args.target_output == None)), "Missing inputs, please check help" 
 
 infiles = [args.source_input]
 if args.target_input:
@@ -68,7 +67,7 @@ count = 0
 counts = numpy.zeros(2)
 
 for ii in idxs:
-    for fi in len(infiles):
+    for fi in range(len(infiles)):
         pos = indices_in[fi][ii]['pos']
         length = indices_in[fi][ii]['length']
         vlarrays_out[fi].append(vlarrays_in[fi][pos:(pos+length)])
