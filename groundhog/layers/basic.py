@@ -162,7 +162,9 @@ class Container(object):
         """
         Save the model to file `filename`
         """
-        vals = dict([(x.name, x.get_value()) for x in self.params])
+        vals = dict([(x.name, x.get_value())
+            for x in
+            filter(lambda x : not x.name in self.not_save_params, self.params)])
         numpy.savez(filename, **vals)
 
     def load(self, filename):
@@ -170,9 +172,10 @@ class Container(object):
         Load the model.
         """
         vals = numpy.load(filename)
-        for p in self.params:
+        for p in filter(lambda p : not p.name in self.not_save_params,
+                self.params):
             if p.name in vals:
-                logger.debug('Loading {} of {}'.format(p.name, p.get_value(borrow=True).shape))
+                logger.debug('Loading {}'.format(p.name))
                 if p.get_value().shape != vals[p.name].shape:
                     raise Exception("Shape mismatch: {} != {} for {}"
                             .format(p.get_value().shape, vals[p.name].shape, p.name))
@@ -180,10 +183,11 @@ class Container(object):
             else:
                 # FIXME: do not stop loading even if there's a parameter value missing
                 #raise Exception("No parameter {} given".format(p.name))
-                logger.error( "No parameter {} given: default initialization used".format(p.name))
+                logger.warning( "No parameter {} given: default initialization used"
+                        .format(p.name))
         unknown = set(vals.keys()) - {p.name for p in self.params}
         if len(unknown):
-            logger.error("Unknown parameters {} given".format(unknown))
+            logger.warning("Unknown parameters {} given".format(unknown))
 
 class Layer(Container):
     """
@@ -473,7 +477,6 @@ class Layer(Container):
         if 'one_step' in kwargs:
             del kwargs['one_step']
         new_obj.prev_args = (args, kwargs)
-
         if kind == 'fprop':
             new_obj.fprop(*args, **kwargs)
         elif kind == 'eval':
@@ -499,7 +502,8 @@ class Model(Container):
                  sample_fn,
                  indx_word="/data/lisa/data/PennTreebankCorpus/dictionaries.npz",
                  indx_word_src=None,
-                 rng =None):
+                 rng =None,
+                 not_save_params=[]):
         super(Model, self).__init__()
         if rng == None:
             rng = numpy.random.RandomState(123)
@@ -512,6 +516,7 @@ class Model(Container):
         self.indx_word_src = indx_word_src
         self.param_grads = output_layer.grads
         self.params = output_layer.params
+        self.not_save_params = not_save_params
         self.updates = output_layer.updates
         self.noise_params = output_layer.noise_params
         self.noise_params_shape_fn = output_layer.noise_params_shape_fn

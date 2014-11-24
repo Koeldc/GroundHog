@@ -186,6 +186,7 @@ class SGD(object):
         # Run the trianing function
         g_st = time.time()
         rvals = self.train_fn()
+        #import ipdb; ipdb.set_trace()
         for schedule in self.schedules:
             schedule(self, rvals[-1])
         self.update_fn()

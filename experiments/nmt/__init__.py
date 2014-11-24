@@ -15,6 +15,8 @@ from state import\
     prototype_encdec_state_zh,\
     prototype_encdec_state_zh_en,\
     prototype_search_state,\
+    prototype_search_state_test_prototype,\
+    prototype_search_state_test_prototype_eos20,\
     prototype_search_state_zh_en,\
     prototype_search_state_zh_en_small,\
     prototype_search_state_zh_en_test,\

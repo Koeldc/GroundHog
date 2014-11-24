@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+import argparse
 import numpy
 import logging
 import pprint
@@ -16,8 +19,6 @@ from groundhog.datasets import PytablesBitextIterator_UL
 from groundhog.models import LM_Model
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
 from groundhog.mainLoop import MainLoop
-from experiments.nmt import prototype_lm_state,\
-                            prototype_lm_state_en
 
 from groundhog.layers import\
         Layer,\
@@ -38,6 +39,7 @@ from groundhog.layers import\
         DropOp,\
         Concatenate
 
+import experiments.nmt
 
 def none_if_zero(x):
     if x == 0:
@@ -239,7 +241,7 @@ class LM_builder(object):
     def __create_layers__(self, build_output=True):
         
         self.emb_words = MultiLayer(
-            rng,
+            self.rng,
             n_in=self.state['n_sym'],
             n_hids=self.state['rank_n_approx'],
             activation=eval(self.state['rank_n_activ']),
@@ -249,7 +251,7 @@ class LM_builder(object):
             **self.default_kwargs)
 
         self.rec = eval(self.state['rec_layer'])(
-                rng,
+                self.rng,
                 n_hids=self.state['dim'],
                 activation = eval(self.state['activ']),
                 bias_scale = self.state['bias'],
@@ -283,9 +285,10 @@ class LM_builder(object):
                 name='updater',
                 **gate_kwargs)
         
+        # if all we care about is the hidden layer
         if build_output:
             self.output_layer = SoftmaxLayer(
-                rng,
+                self.rng,
                 self.state['dim'],
                 self.state['n_sym'],
                 self.state['out_scale'],
@@ -295,7 +298,7 @@ class LM_builder(object):
                 sum_over_time=True,
                 name='lm_out')
 
-    def build_for_translation(self, target, target_mask=None, prev_hid==None):
+    def build_for_translation(self, target, target_mask=None, prev_hid=None):
         """
         This function builds the language model for the machine translation
         system, naturally it requires the target, and target_mask
@@ -303,29 +306,39 @@ class LM_builder(object):
         In the sampling step, we have no target_mask
 
         """
-        # this assertion doesn't really make sense
-        assert target.ndim == 3
+        # TODO 
+        # this assertion doesn't really make sense at the moment. 
+        #assert target.ndim == 3
+        if target.ndim == 1:
+            n_samples = 1
+        else:
+            n_samples = target.shape[1]
 
-        n_samples = self.target.shape[1]
-
-        x_emb = self.emb_words(self.target, no_noise_bias=self.state['no_noise_bias'])
+        x_emb = self.emb_words(target, no_noise_bias=self.state['no_noise_bias'])
 
         input_signals = self.inputer(x_emb) 
         update_signals = self.updater(x_emb)
         reset_signals = self.reseter(x_emb) 
 
-        # if we are doing sampling, we expect a prev_hid state but no target mask,
-
-        self.rec_layer = self.rec(input_signals, mask=target_mask, 
-                    state_before=prev_hid
-                    no_noise_bias=self.state['no_noise_bias'],
-                    batch_size=n_samples,
-                    one_step= True if (prev_hid is not None) and
-                              (target_mask is None) else False,
-                    gater_below=none_if_zero(update_signals),
-                    reseter_below=none_if_zero(reset_signals),
-                     )
-        return self.rec_layer
+        # if we are doing sampling, we expect a prev_hid state
+        if prev_hid is not None:
+            self.rec_layer = self.rec(input_signals,
+                        state_before=prev_hid,
+                        no_noise_bias=self.state['no_noise_bias'],
+                        one_step=True,
+                        use_noise=False,
+                        gater_below=none_if_zero(update_signals),
+                        reseter_below=none_if_zero(reset_signals),
+                         )
+        else:
+            self.rec_layer = self.rec(input_signals, mask=target_mask, 
+                        no_noise_bias=self.state['no_noise_bias'],
+                        batch_size=n_samples,
+                        one_step=False,
+                        gater_below=none_if_zero(update_signals),
+                        reseter_below=none_if_zero(reset_signals),
+                        )         
+        return self.rec_layer 
 
     def get_const_params(self):
         """
@@ -418,9 +431,30 @@ class LM_builder(object):
                 updates=updates, profile=False, name='sample_fn')
 
         return sample_fn
- 
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--state", help="State to use")
+    parser.add_argument("--proto",  default="prototype_state",
+        help="Prototype state to use for state")
+    parser.add_argument("--skip-init", action="store_true",
+        help="Skip parameter initilization")
+    parser.add_argument("changes",  nargs="*", help="Changes to state", default="")
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    state = prototype_lm_state_en()
+    # copying construction from experiment/nmt/train.py
+    # Grab prototype specified by proto
+    args = parse_args()
+    state = getattr(experiments.nmt, args.proto)()
+    if args.state:
+        if args.state.endswith(".py"):
+            state.update(eval(open(args.state).read()))
+        else:
+            with open(args.state) as src:
+                state.update(cPickle.load(src))
+    for change in args.changes:
+        state.update(eval("dict({})".format(change)))
 
     rng = numpy.random.RandomState(state['seed'])
 

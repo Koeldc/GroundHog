@@ -136,8 +136,10 @@ class LM_Model(Model):
             scale = numpy.float32(1)
         scale *= numpy.float32(numpy.log(2))
 
-        grad_norm = TT.sqrt(sum(TT.sum(x**2)
-            for x,p in zip(self.param_grads, self.params) if p not in
+        _params = [p for p in self.params if p not in self.exclude_params]
+        _param_grads = [g for p, g in zip(self.params,self.param_grads) if p not in self.exclude_params]
+        grad_norm = TT.sqrt(sum(TT.sum(TT.sqr(x))
+            for x,p in zip(_param_grads, _params) if p not in
                 self.exclude_params_for_norm))
         # another place to add stuff that gets saved into timing.npz
         new_properties = [

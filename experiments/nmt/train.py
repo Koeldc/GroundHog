@@ -7,10 +7,12 @@ import pprint
 import re
 import numpy
 import time
-
 import ipdb
 
+from subprocess import Popen, PIPE
+
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
+from groundhog.trainer.SGD_rmspropv2 import SGD as SGD_rmsprop
 from groundhog.trainer.SGD import SGD as SGD
 from groundhog.trainer.SGD_momentum import SGD as SGD_momentum
 from groundhog.mainLoop import MainLoop
@@ -19,9 +21,8 @@ from experiments.nmt import\
         BeamSearch, parse_input 
 import experiments.nmt
 
-from subprocess import Popen, PIPE
-
 logger = logging.getLogger(__name__)
+
 
 class RandomSamplePrinter(object):
 
@@ -264,10 +265,11 @@ def main():
             reset=state['reset'],
             bleu_val_fn = bleu_validator, 
             hooks=[RandomSamplePrinter(state, lm_model, train_data)]
-                if state['hookFreq'] >= 0 and state['validation_set'] is not None
+                if state['hookFreq'] >= 0
                 else None)
 
-    if state['reload']:
+    # should also load if we are going to warm start from a pretrained lm
+    if state['reload'] or state['reload_lm']:
         main.load()
     if state['loopIters'] > 0:
         main.main()

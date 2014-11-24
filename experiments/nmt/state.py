@@ -735,6 +735,10 @@ def prototype_search_state_test_prototype():
     state = prototype_encdec_state()
 
     state['include_lm'] = True
+    state['reload_lm'] = True 
+    state['cutoff'] = 1.0
+    state['hookFreq'] =400
+    state['saveFreq'] = 1000
 
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
@@ -743,5 +747,27 @@ def prototype_search_state_test_prototype():
     state['backward'] = True
     state['seqlen'] = 50
     state['sort_k_batches'] = 20
-    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint/search_'
+    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint/search_test_'
+    return state
+
+def prototype_search_state_test_prototype_eos20():
+    """This prototype is the configuration used to train the RNNsearch-50 model from the paper
+    'Neural Machine Translation by Jointly Learning to Align and Translate' """
+
+    state = prototype_encdec_state()
+
+    state['include_lm'] = True
+    state['reload_lm'] = True 
+    state['cutoff'] = 1.0
+    state['hookFreq'] =200
+    state['algo'] = 'SGD_rmsprop'
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+    state['seqlen'] = 50
+    state['sort_k_batches'] = 20
+    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint_eos20/search_test_'
     return state
