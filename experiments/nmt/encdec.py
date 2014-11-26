@@ -1368,13 +1368,14 @@ class Decoder(EncoderDecoderBase):
                 name="{}_sampler_scan".format(self.prefix))
         return (outputs[0], outputs[1]), updates
 
-    def build_next_probs_predictor(self, c, step_num, y, init_states):
+    # TODO, make prev_hid default None
+    def build_next_probs_predictor(self, c, step_num, y, init_states, prev_hid):
         return self.build_decoder(c, y, mode=Decoder.BEAM_SEARCH,
-                given_init_states=init_states, step_num=step_num)
+                given_init_states=init_states, step_num=step_num, prev_hid=prev_hid)
 
-    def build_next_states_computer(self, c, step_num, y, init_states):
+    def build_next_states_computer(self, c, step_num, y, init_states, prev_hid):
         return self.build_decoder(c, y, mode=Decoder.SAMPLING,
-                given_init_states=init_states, step_num=step_num)[2:]
+                given_init_states=init_states, step_num=step_num, prev_hid=prev_hid)[2:]
 
 class RNNEncoderDecoder(object):
     """This class encapsulates the translation model.
@@ -1527,6 +1528,9 @@ class RNNEncoderDecoder(object):
                 for i in range(self.decoder.num_levels)]
         self.gen_y = TT.lvector("gen_y")
 
+        if self.state['include_lm']:
+            self.current_states_lm = TT.matrix("cur_lm_hid")
+
     # note we are calling this a lm, when really it is a translation model
     def create_lm_model(self):
         # singleton constructor
@@ -1601,18 +1605,18 @@ class RNNEncoderDecoder(object):
     def create_next_probs_computer(self):
         if not hasattr(self, 'next_probs_fn'):
             self.next_probs_fn = theano.function(
-                    inputs=[self.c, self.step_num, self.gen_y] + self.current_states,
+                    inputs=[self.c, self.step_num, self.gen_y] + [self.current_states_lm] + self.current_states,
                     outputs=[self.decoder.build_next_probs_predictor(
-                        self.c, self.step_num, self.gen_y, self.current_states)],
+                        self.c, self.step_num, self.gen_y, self.current_states, self.current_states_lm)],
                     name="next_probs_fn")
         return self.next_probs_fn
 
     def create_next_states_computer(self):
         if not hasattr(self, 'next_states_fn'):
             self.next_states_fn = theano.function(
-                    inputs=[self.c, self.step_num, self.gen_y] + self.current_states,
+                    inputs=[self.c, self.step_num, self.gen_y] + [self.current_states_lm]+ self.current_states,
                     outputs=self.decoder.build_next_states_computer(
-                        self.c, self.step_num, self.gen_y, self.current_states),
+                        self.c, self.step_num, self.gen_y, self.current_states, self.current_states_lm),
                     name="next_states_fn")
         return self.next_states_fn
 
