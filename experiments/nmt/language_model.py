@@ -18,6 +18,7 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 from groundhog.datasets import PytablesBitextIterator_UL
 from groundhog.models import LM_Model
 from groundhog.trainer.SGD_adadelta import SGD as SGD_adadelta
+from groundhog.trainer.SGD_rmsprop import SGD as SGD_rmsprop
 from groundhog.mainLoop import MainLoop
 
 from groundhog.layers import\

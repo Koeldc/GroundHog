@@ -222,6 +222,8 @@ def prototype_phrase_state():
     # ----- Say something about loading language models ----
 
     state['include_lm'] = False
+    state['train_only_readout'] = False
+    state['reload_lm'] = False
 
     # ----- TRAINING PROCESS -----
 
@@ -752,15 +754,28 @@ def prototype_search_state_test_prototype():
 
 def prototype_search_state_test_prototype_eos20():
     """This prototype is the configuration used to train the RNNsearch-50 model from the paper
-    'Neural Machine Translation by Jointly Learning to Align and Translate' """
+    'Neural Machine Translation by Jointly Learning to Align and Translate'
+
+    This prototype is meant to turn only the maxout parameters
+    """
 
     state = prototype_encdec_state()
 
     state['include_lm'] = True
-    state['reload_lm'] = True 
+    state['reload_lm'] = True
+    state['train_only_readout'] = True
+
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/eval/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/xukelvin/translation/europarl/ntst1213_short.fr'
+    state['validation_set'] = '/data/lisatmp3/xukelvin/translation/europarl/ntst1213_short.en'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/tmp/joint_eos20/val_out.txt'
+    state['beam_size'] = 5
+    state['bleu_val_frequency'] = 10000
+    state['burn_in'] = 9999
+
     state['cutoff'] = 1.0
-    state['hookFreq'] =200
-    state['algo'] = 'SGD_rmsprop'
+    state['hookFreq'] = 1000
+    state['saveFreq'] = 2000
 
     state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
     state['search'] = True
@@ -769,5 +784,42 @@ def prototype_search_state_test_prototype_eos20():
     state['backward'] = True
     state['seqlen'] = 50
     state['sort_k_batches'] = 20
-    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint_eos20/search_test_'
+    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint_eos20/tune_readout_'
+
+    return state
+
+def prototype_search_state_test_prototype_bart10():
+    """This prototype is the configuration used to train the RNNsearch-50 model from the paper
+    'Neural Machine Translation by Jointly Learning to Align and Translate'
+
+    Tune all the params!
+    """
+
+    state = prototype_encdec_state()
+
+    state['include_lm'] = True
+    state['reload_lm'] = True
+    state['train_only_readout'] = False
+
+    state['bleu_script'] = '/u/xukelvin/Documents/research/machine_trans/eval/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/xukelvin/translation/europarl/ntst1213_short.fr'
+    state['validation_set'] = '/data/lisatmp3/xukelvin/translation/europarl/ntst1213_short.en'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/tmp/joint_bart10/val_out.txt'
+    state['beam_size'] = 5
+    state['bleu_val_frequency'] = 10000
+    state['burn_in'] = 9999
+
+    state['cutoff'] = 1.0
+    state['hookFreq'] = 1000
+    state['saveFreq'] = 2000
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+    state['seqlen'] = 50
+    state['sort_k_batches'] = 20
+    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint_bart10/tune_all_'
+
     return state

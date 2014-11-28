@@ -250,6 +250,7 @@ def main():
     if state['bleu_script'] is not None and state['validation_set'] is not None \
         and state['validation_set_grndtruth'] is not None:
         # make beam search       
+        logger.debug("Using Early Stopping with Bleu!!!!!!!!")
         beam_search = BeamSearch(enc_dec)
         beam_search.compile()
         bleu_validator = BleuValidator(state, lm_model, beam_search, verbose=state['output_validation_set']) 

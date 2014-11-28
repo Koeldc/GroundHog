@@ -948,6 +948,9 @@ class Decoder(EncoderDecoderBase):
                         **decoding_kwargs)
 
     def _create_readout_layers(self):
+        # created if we want to tune just the readout layer
+        self.readout_params = []
+
         softmax_layer = self.state['softmax_layer'] if 'softmax_layer' in self.state \
                         else 'SoftmaxLayer'
 
@@ -966,6 +969,8 @@ class Decoder(EncoderDecoderBase):
                 name='{}_repr_readout'.format(self.prefix),
                 **readout_kwargs)
 
+        self.readout_params += self.repr_readout.params
+
         # Attention - this is the only readout layer
         # with trainable bias. Should be careful with that.
         self.hidden_readouts = [None] * self.num_levels
@@ -975,6 +980,7 @@ class Decoder(EncoderDecoderBase):
                 n_in=self.state['dim'],
                 name='{}_hid_readout_{}'.format(self.prefix, level),
                 **readout_kwargs)
+            self.readout_params += self.hidden_readouts[level].params
 
         # connection from previous word to current
         self.prev_word_readout = 0
@@ -987,6 +993,7 @@ class Decoder(EncoderDecoderBase):
                 learn_bias=False,
                 name='{}_prev_readout_{}'.format(self.prefix, level),
                 **self.default_kwargs)
+            self.readout_params += self.prev_word_readout.params
 
         if self.state['include_lm']:
             self.lm_embedder = MultiLayer(
@@ -997,6 +1004,7 @@ class Decoder(EncoderDecoderBase):
                 learn_bias=False,
                 name='{}_lm_embed_{}'.format(self.prefix, level),
                 **self.default_kwargs)
+            self.readout_params += self.lm_embedder.params
 
         # turns on intermediate maxout layer
         if self.state['deep_out']:
@@ -1012,6 +1020,9 @@ class Decoder(EncoderDecoderBase):
                     name='{}_deep_softmax'.format(self.prefix),
                     use_nce=self.state['use_nce'] if 'use_nce' in self.state else False,
                     **self.default_kwargs)
+            self.readout_params += act_layer.params
+            self.readout_params += drop_layer.params
+            self.readout_params += self.output_layer.params
         else:
             self.output_nonlinearities = []
             self.output_layer = eval(softmax_layer)(
@@ -1024,6 +1035,7 @@ class Decoder(EncoderDecoderBase):
                     sum_over_time=True,
                     use_nce=self.state['use_nce'] if 'use_nce' in self.state else False,
                     **self.default_kwargs)
+            self.readout_params += self.output_layer.params
 
     def build_decoder(self, c, y,
             c_mask=None,
@@ -1540,7 +1552,20 @@ class RNNEncoderDecoder(object):
         # weights and optionally its embedding matrix
         excluded_params = None
         if hasattr(self.decoder, 'excluded_params'):
-            excluded_params = self.decoder.excluded_params
+            if self.state['train_only_readout']:
+                # exclude the union of the NON-readout parameters and the whole graph (this
+                # accounts for lm params) + the embeddings (leave these) 
+                excluded_params = list((set(self.predictions.params) - set(self.decoder.readout_params))\
+                                     | set(self.decoder.approx_embedder.params))
+            # just exclude the language model
+            else:
+                excluded_params = self.decoder.excluded_params
+            # verbose for debugging purposes
+            logger.debug("Excluding these params for training:")
+            print excluded_params
+            logger.debug("Training these params:")
+            print list(set(self.predictions.params)-set(excluded_params))
+
         self.lm_model = LM_Model(
             cost_layer=self.predictions,
             sample_fn=self.create_sampler(),

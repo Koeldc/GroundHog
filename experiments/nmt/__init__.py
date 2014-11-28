@@ -1,6 +1,7 @@
 from state_lm import\
     prototype_lm_state,\
-    prototype_lm_state_en
+    prototype_lm_state_en,\
+    prototype_lm_state_fr\
 
 from language_model import LM_builder
 
@@ -17,6 +18,7 @@ from state import\
     prototype_search_state,\
     prototype_search_state_test_prototype,\
     prototype_search_state_test_prototype_eos20,\
+    prototype_search_state_test_prototype_bart10,\
     prototype_search_state_zh_en,\
     prototype_search_state_zh_en_small,\
     prototype_search_state_zh_en_test,\

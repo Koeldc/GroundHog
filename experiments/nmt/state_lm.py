@@ -108,7 +108,7 @@ def prototype_lm_state():
     state['overwrite'] = 1
 
     # Number of batches to process
-    state['loopIters'] = 3000000
+    state['loopIters'] = 30000000
     # Maximum number of minutes to run
     state['timeStop'] = 24*60*7
     # Error level to stop at
@@ -136,6 +136,15 @@ def prototype_lm_state():
     return state
 
 
+def prototype_lm_state_fr():
+    state = prototype_lm_state()
+    state['loopIters'] = 3000000000
+    state['saveFreq'] = 30
+    state['bs'] = 120
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/fr_lm2/lm_'
+    
+    return state
+
 def prototype_lm_state_en():
     state = prototype_lm_state()
     state['target'] = '/data/lisatmp3/xukelvin/translation/en_lm/binarized_wiki.en.shuf.h5'
@@ -143,9 +152,12 @@ def prototype_lm_state_en():
     state['indx_word'] = '/data/lisatmp3/xukelvin/translation/en_lm/ijoint_vocab.pkl'
     state['word_indx'] = '/data/lisatmp3/xukelvin/translation/en_lm/joint_vocab.pkl'
 
+    state['algo'] = 'SGD_rmsprop'
+    state['lr'] = 1e-4
+    state['bs'] = 128
     # index of 'the' in english 
     state['sampling_seed'] = 4
 
-    state['prefix'] = '/data/lisatmp3/xukelvin/translation/en_lm/lm_'
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/en_lm/lm_v2_'
 
     return state
