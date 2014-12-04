@@ -788,6 +788,76 @@ def prototype_search_state_test_prototype_eos20():
 
     return state
 
+def prototype_search_state_test_prototype_eos20_2():
+    """This prototype is the configuration used to train the RNNsearch-50 model from the paper
+    'Neural Machine Translation by Jointly Learning to Align and Translate'
+    """
+
+    state = prototype_encdec_state()
+
+    state['include_lm'] = True
+    state['reload_lm'] = True
+    state['train_only_readout'] = False
+
+    state['bleu_script'] = '/data/lisatmp3/bahdanau/dev/multi-bleu.perl'
+    state['validation_set_grndtruth'] = '/data/lisatmp3/xukelvin/translation/europarl/ntst1213.fr'
+    state['validation_set'] = '/data/lisatmp3/xukelvin/translation/europarl/ntst1213.en'
+    state['validation_set_out'] = '/data/lisatmp3/xukelvin/tmp/joint_eos20_2/val_out.txt'
+    state['beam_size'] = 5
+    state['bleu_val_frequency'] = 5000
+    state['burn_in'] = 9999
+
+    state['cutoff'] = 1.0
+    state['hookFreq'] = 1000
+    state['saveFreq'] = 2000
+
+    state['null_sym_source'] = 50000
+    state['null_sym_target'] = 50000
+
+    state['n_sym_source'] = state['null_sym_source'] + 1
+    state['n_sym_target'] = state['null_sym_target'] + 1
+
+    state['output_validation_set'] = True
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+    state['seqlen'] = 50
+    state['sort_k_batches'] = 20
+    state['prefix'] = '/data/lisatmp3/xukelvin/tmp/joint_eos20_2/tune_all_'
+
+    return state
+
+def prototype_search_state_eos15():
+    """
+    Reproduce Dima's results with larger vocab.
+    """
+
+    state = prototype_encdec_state()
+
+    state = prototype_encdec_state()
+
+    state['dec_rec_layer'] = 'RecurrentLayerWithSearch'
+    state['search'] = True
+    state['last_forward'] = False
+    state['forward'] = True
+    state['backward'] = True
+    state['seqlen'] = 50
+    state['sort_k_batches'] = 20
+    state['prefix'] = '/data/lisatmp3/xukelvin/translation/dima_reproduce/en_fr_search_50_'
+
+    state['null_sym_source'] = 50000
+    state['null_sym_target'] = 50000
+
+    state['n_sym_source'] = state['null_sym_source'] + 1
+    state['n_sym_target'] = state['null_sym_target'] + 1
+
+
+    return state
+
+
 def prototype_search_state_test_prototype_bart10():
     """This prototype is the configuration used to train the RNNsearch-50 model from the paper
     'Neural Machine Translation by Jointly Learning to Align and Translate'

@@ -28,7 +28,8 @@ from groundhog.utils import sample_zeros, sample_weights_orth, init_bias, sample
 import groundhog.utils as utils
 from experiments.nmt import \
         LM_builder,\
-        prototype_lm_state
+        prototype_lm_state,\
+        prototype_lm_state_fr_50k
 
 logger = logging.getLogger(__name__)
 
@@ -839,7 +840,7 @@ class Decoder(EncoderDecoderBase):
 
         # should we really keep these separate?
         if self.state['include_lm']:
-            self.state_lm = prototype_lm_state()
+            self.state_lm = prototype_lm_state_fr_50k()
 
         # Actually there is a problem here -
         # we don't make difference between number of input layers
@@ -887,7 +888,7 @@ class Decoder(EncoderDecoderBase):
                         self.decode_updaters[level])
 
     def _create_lm(self): 
-        logger.debug("Creating language model")
+        logger.debug("Creating External language model")
         self.LM_builder = LM_builder(self.state_lm, self.rng, skip_init=False)
         # build output refers to the softmax over words 
         self.LM_builder.__create_layers__(build_output=False)
@@ -1555,6 +1556,7 @@ class RNNEncoderDecoder(object):
             if self.state['train_only_readout']:
                 # exclude the union of the NON-readout parameters and the whole graph (this
                 # accounts for lm params) + the embeddings (leave these) 
+                # self.prediction.params are all the parameter
                 excluded_params = list((set(self.predictions.params) - set(self.decoder.readout_params))\
                                      | set(self.decoder.approx_embedder.params))
             # just exclude the language model
